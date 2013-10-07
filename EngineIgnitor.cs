@@ -25,12 +25,14 @@ namespace EngineIgnitor
 		private string ignitionsAvailableString = "Infinite";
 
 		// If we don't have thrust but we still have such temperature then it can auto-ignite when throttle up again.
+		[KSPField(isPersistant = false)]
 		public float autoIgnitionTemperature = 800;
 
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Auto-Ignite")]
 		private string autoIgnitionState = "?/800";
 
 		// In case we have multiple engines...
+		[KSPField(isPersistant = false)]
 		public int engineIndex = 0;
 
 		// List of all engines. So we can pick the one we are corresponding to.
@@ -62,6 +64,14 @@ namespace EngineIgnitor
 				engine = null;
 		}
 
+		public override string GetInfo()
+		{
+			if (ignitionsAvailable != -1)
+				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n";
+			else
+				return "Can ignite for infinite times.\n";
+		}
+
 		public override void OnUpdate()
 		{
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
@@ -75,10 +85,7 @@ namespace EngineIgnitor
 				autoIgnitionState = part.temperature.ToString("F1") + "/" + autoIgnitionTemperature.ToString("F1");
 			else
 				autoIgnitionState = "?/" + autoIgnitionTemperature.ToString("F1");
-		}
 
-		public override void OnFixedUpdate()
-		{
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
 			if (engine.allowShutdown == false) return;
