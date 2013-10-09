@@ -16,6 +16,36 @@ namespace EngineIgnitor
 			IGNITED = 2,
 		}
 
+		[System.Serializable]
+		public class IgnitorResource
+		{
+			public string name;
+			public int id;
+			public float amount;
+			public float currentAmount;
+
+			public IgnitorResource()
+			{ 
+			}
+
+			public void Load(ConfigNode node)
+			{
+				name = node.GetValue("name");
+				id = name.GetHashCode();
+
+				if (node.HasValue("amount"))
+				{
+					amount = Mathf.Max(0.0f, float.Parse(node.GetValue("amount")));
+				}
+			}
+
+			public void Save(ConfigNode node)
+			{
+				node.AddValue("name", name);
+				node.AddValue("amount", Mathf.Max(0.0f, amount));
+			}
+		}
+
 		// We can ignite as many times as we want by default.
 		// -1: Infinite. 0: Unavailable. 1~...: As is.
 		[KSPField(isPersistant = true)]
@@ -46,6 +76,7 @@ namespace EngineIgnitor
 		private EngineIgnitionState engineState = EngineIgnitionState.INVALID;
 
 		private StartState m_startState = StartState.None;
+		public List<IgnitorResource> ignitorResources;
 
 		public override void OnStart(StartState state)
 		{
@@ -62,6 +93,12 @@ namespace EngineIgnitor
 				engine = engines[engineIndex];
 			else
 				engine = null;
+		}
+
+		public override void OnAwake()
+		{
+			if (ignitorResources == null)
+				ignitorResources = new List<IgnitorResource>();
 		}
 
 		public override string GetInfo()
@@ -109,18 +146,52 @@ namespace EngineIgnitor
 				engineState = EngineIgnitionState.IGNITED;
 			}
 
+			// This flag is for low-resource state.
+			bool preferShutdown = false;
+
 			// Here comes the state transition process.
 			if (oldState == EngineIgnitionState.NOT_IGNITED && engineState == EngineIgnitionState.IGNITED)
-			{ 
+			{
 				// We need to consume one ignitor to light it up.
-				if (ignitionsAvailable > 0)
+				if (ignitionsAvailable > 0 || ignitionsAvailable == -1)
 				{
-					ignitionsAvailable--;
+					if (ignitorResources.Count != 0)
+					{
+						// We need to check if we have all ignitor resources.
+						float minPotential = 1.0f;
+						foreach (IgnitorResource resource in ignitorResources)
+						{
+							resource.currentAmount = part.RequestResource(resource.id, resource.amount);
+							minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
+						}
+
+						bool ignited = ( UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential );
+						if (ignited == false)
+						{
+							engineState = EngineIgnitionState.NOT_IGNITED;
+							
+							// Low in resources. Prefer to shutdown. Otherwise the ignitor device will be expired.
+							//if (minPotential < 0.95f)
+							//	preferShutdown = true;
+
+							// Always shutdown the engine if it fails to ignite. player can manually retry.
+							preferShutdown = true;
+						}
+					}
+
+					// The ignitor device has been used no matter the ignition is successful or not.
+					if(ignitionsAvailable > 0)
+						ignitionsAvailable--;
 				}
 				else if (ignitionsAvailable == 0)
 				{
 					// Oops.
 					engineState = EngineIgnitionState.NOT_IGNITED;
+				}
+				else
+				{ 
+					// Oooooops.
+					Debug.Log("Invalid IgnitionsAvaiable: " + ignitionsAvailable.ToString());
 				}
 			}
 			else if (oldState == EngineIgnitionState.HIGH_TEMP && engineState == EngineIgnitionState.IGNITED)
@@ -130,7 +201,7 @@ namespace EngineIgnitor
 			}
 
 			// Finally we need to handle the thrust generation. i.e. forcibly shutdown the engine when needed.
-			if (engineState == EngineIgnitionState.NOT_IGNITED && ignitionsAvailable == 0)
+			if (engineState == EngineIgnitionState.NOT_IGNITED && (ignitionsAvailable == 0 || preferShutdown == true))
 			{
 				foreach (BaseEvent baseEvent in engine.Events)
 				{
@@ -139,6 +210,34 @@ namespace EngineIgnitor
 					{
 						baseEvent.Invoke();
 					}
+				}
+			}
+		}
+
+		public override void OnSave(ConfigNode node)
+		{
+			base.OnSave(node);
+			foreach (IgnitorResource ignitorResource in ignitorResources)
+			{
+				ignitorResource.Save(node.AddNode("IGNITOR_RESOURCE"));
+			}
+		}
+
+		public override void OnLoad(ConfigNode node)
+		{
+			base.OnLoad(node);
+			foreach (ConfigNode subNode in node.nodes)
+			{
+				if (subNode.name == "IGNITOR_RESOURCE")
+				{
+					if (!subNode.HasValue("name") || !subNode.HasValue("amount"))
+					{
+						Debug.Log("Ignitor Resource must have \'name\' and \'amount\'.");
+						continue;
+					}
+					IgnitorResource newIgnitorResource = new IgnitorResource();
+					newIgnitorResource.Load(subNode);
+					ignitorResources.Add(newIgnitorResource);
 				}
 			}
 		}
