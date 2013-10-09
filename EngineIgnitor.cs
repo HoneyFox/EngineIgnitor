@@ -20,7 +20,6 @@ namespace EngineIgnitor
 		public class IgnitorResource
 		{
 			public string name;
-			public int id;
 			public float amount;
 			public float currentAmount;
 
@@ -31,7 +30,6 @@ namespace EngineIgnitor
 			public void Load(ConfigNode node)
 			{
 				name = node.GetValue("name");
-				id = name.GetHashCode();
 
 				if (node.HasValue("amount"))
 				{
@@ -93,10 +91,63 @@ namespace EngineIgnitor
 				engine = engines[engineIndex];
 			else
 				engine = null;
+
+			if (ignitorResources != null)
+			{
+				Debug.Log("We still have " + ignitorResources.Count.ToString() + " left in the list.");
+			}
+			
+			ignitorResources = new List<IgnitorResource>();
+			Debug.Log("Assume IgnitorResources list is lost. Trying to re-establish.");
+
+			if (part.partInfo != null)
+			{
+				ConfigNode node = null;
+
+				Debug.Log(part.partInfo.name);
+				foreach (UrlDir.UrlConfig config in GameDatabase.Instance.GetConfigs("PART"))
+				{
+					Debug.Log(config.name.Replace("_", "."));
+					if (config.name.Replace("_", ".") == part.partInfo.name)
+					{
+						foreach (ConfigNode configNode in config.config.GetNodes("MODULE"))
+						{
+							Debug.Log(configNode.GetValue("name"));
+							if (configNode.GetValue("name") == moduleName && (configNode.HasValue("engineIndex") == false || int.Parse(configNode.GetValue("engineIndex")) == engineIndex))
+							{
+								node = configNode;
+								break;
+							}
+						}
+						break;
+					}
+				}
+				
+				if (node != null)
+				{
+					Debug.Log("Original module config node found.");
+					foreach (ConfigNode subNode in node.GetNodes("IGNITOR_RESOURCE"))
+					{
+						Debug.Log("IgnitorResource node found.");
+						if (subNode.HasValue("name") == false || subNode.HasValue("amount") == false)
+						{
+							Debug.Log("Ignitor Resource must have \'name\' and \'amount\'.");
+							continue;
+						}
+						IgnitorResource newIgnitorResource = new IgnitorResource();
+						newIgnitorResource.Load(subNode);
+						Debug.Log("IgnitorResource added: " + newIgnitorResource.name + " " + newIgnitorResource.amount.ToString("F2"));
+						ignitorResources.Add(newIgnitorResource);
+					}
+				}
+			}
+			Debug.Log("Total ignitor resources: " + ignitorResources.Count.ToString());
 		}
 
 		public override void OnAwake()
 		{
+			base.OnAwake();
+
 			if (ignitorResources == null)
 				ignitorResources = new List<IgnitorResource>();
 		}
@@ -155,21 +206,23 @@ namespace EngineIgnitor
 				// We need to consume one ignitor to light it up.
 				if (ignitionsAvailable > 0 || ignitionsAvailable == -1)
 				{
-					if (ignitorResources.Count != 0)
+					if (ignitorResources.Count > 0)
 					{
+						Debug.Log("We need to check ignitor resources.");
 						// We need to check if we have all ignitor resources.
 						float minPotential = 1.0f;
 						foreach (IgnitorResource resource in ignitorResources)
 						{
-							resource.currentAmount = part.RequestResource(resource.id, resource.amount);
+							resource.currentAmount = part.RequestResource(resource.name, resource.amount);
 							minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
 						}
 
-						bool ignited = ( UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential );
+						bool ignited = (UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential);
+						Debug.Log("Potential = " + minPotential.ToString("F2") + " Ignited: " + ignited.ToString());
 						if (ignited == false)
 						{
 							engineState = EngineIgnitionState.NOT_IGNITED;
-							
+
 							// Low in resources. Prefer to shutdown. Otherwise the ignitor device will be expired.
 							//if (minPotential < 0.95f)
 							//	preferShutdown = true;
@@ -177,6 +230,10 @@ namespace EngineIgnitor
 							// Always shutdown the engine if it fails to ignite. player can manually retry.
 							preferShutdown = true;
 						}
+					}
+					else
+					{
+						Debug.Log("No ignitor resource needed.");
 					}
 
 					// The ignitor device has been used no matter the ignition is successful or not.
@@ -216,30 +273,30 @@ namespace EngineIgnitor
 
 		public override void OnSave(ConfigNode node)
 		{
-			base.OnSave(node);
 			foreach (IgnitorResource ignitorResource in ignitorResources)
 			{
 				ignitorResource.Save(node.AddNode("IGNITOR_RESOURCE"));
 			}
+			base.OnSave(node);
 		}
 
 		public override void OnLoad(ConfigNode node)
 		{
 			base.OnLoad(node);
-			foreach (ConfigNode subNode in node.nodes)
+			foreach (ConfigNode subNode in node.GetNodes("IGNITOR_RESOURCE"))
 			{
-				if (subNode.name == "IGNITOR_RESOURCE")
+				Debug.Log("IgnitorResource node found.");
+				if (subNode.HasValue("name") == false || subNode.HasValue("amount") == false)
 				{
-					if (!subNode.HasValue("name") || !subNode.HasValue("amount"))
-					{
-						Debug.Log("Ignitor Resource must have \'name\' and \'amount\'.");
-						continue;
-					}
-					IgnitorResource newIgnitorResource = new IgnitorResource();
-					newIgnitorResource.Load(subNode);
-					ignitorResources.Add(newIgnitorResource);
+					Debug.Log("Ignitor Resource must have \'name\' and \'amount\'.");
+					continue;
 				}
+				IgnitorResource newIgnitorResource = new IgnitorResource();
+				newIgnitorResource.Load(subNode);
+				Debug.Log("IgnitorResource added: " + newIgnitorResource.name + " " + newIgnitorResource.amount.ToString("F2"));
+				ignitorResources.Add(newIgnitorResource);
 			}
+			Debug.Log("Total ignitor resources: " + ignitorResources.Count.ToString());
 		}
 	}
 }
