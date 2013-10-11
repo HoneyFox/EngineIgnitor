@@ -8,51 +8,73 @@ namespace EngineIgnitor
 {
 	public class EngineIgnitorUnit : PartModule
 	{
+		public static List<EngineIgnitorUnit> s_IgnitorPacksOnEva = new List<EngineIgnitorUnit>();
+
 		[KSPField(isPersistant = true)]
 		public int ignitors = 1;
 
+		[KSPField(isPersistant = false)]
+		public string ignitorType = "type0";
+
 		private StartState m_startState = StartState.None;
-		private Part parentPart = null;
-		private ModuleEngineIgnitor parentPartModule = null;
+
+		[KSPField(isPersistant = false, guiActive = true, guiName = "IgnitorUnit")]
+		private string ignitorUnitState = "type0 - 1";
 
 		public override void OnStart(StartState state)
 		{
 			m_startState = state;
-
-			if (this.part != null && this.part.parent != null)
-				parentPart = this.part.parent;
-
-			if (parentPart != null)
-			{
-				foreach (PartModule module in this.part.parent.Modules)
-				{
-					if (module is ModuleEngineIgnitor)
-					{
-						parentPartModule = module as ModuleEngineIgnitor;
-						break;
-					}
-				}
-			}
 		}
 
 		public override void OnUpdate()
 		{
-			if (ignitors != 0)
-			{	
-				if (m_startState != StartState.None && m_startState != StartState.Editor)
+			if (m_startState != StartState.None && m_startState != StartState.Editor)
+			{
+				ignitorUnitState = ignitorType + " - " + ((ignitors == -1) ? "Infinite" : ignitors.ToString());
+
+				if (ignitors != 0 && vessel != null)
 				{
-					if (parentPartModule != null)
+					if (vessel.isEVA && vessel.isActiveVessel == true)
 					{
-						parentPartModule.ignitionsAvailable += ignitors;
-						ignitors = 0;
+						// We are now being grabbed by an EVA I guess...
+						if (s_IgnitorPacksOnEva.Contains(this) == false)
+							s_IgnitorPacksOnEva.Add(this);
+					}
+					else
+					{
+						if (s_IgnitorPacksOnEva.Contains(this) == true)
+							s_IgnitorPacksOnEva.Remove(this);
 					}
 				}
+				else
+				{
+					if (s_IgnitorPacksOnEva.Contains(this) == true)
+						s_IgnitorPacksOnEva.Remove(this);
+				}
+			}
+		}
+
+		public int Consume(int count)
+		{
+			if (ignitors == -1)
+				return count;
+
+			if (ignitors >= count)
+			{
+				ignitors -= count;
+				return count;
+			}
+			else
+			{
+				int ignitorCount = ignitors;
+				ignitors = 0;
+				return ignitorCount;
 			}
 		}
 
 		public override string GetInfo()
 		{
-			return "Contains " + ignitors.ToString() + "ignitor unit" + (ignitors > 1 ? "s.\n" : ".\n");
+			return "Contains " + ((ignitors != -1) ? ignitors.ToString() : "infinite") + " " + ignitorType + " ignitor unit" + ((ignitors == -1 || ignitors > 1) ? "s.\n" : ".\n");
 		}
 	}
 }

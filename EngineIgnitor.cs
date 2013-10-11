@@ -46,8 +46,12 @@ namespace EngineIgnitor
 
 		// We can ignite as many times as we want by default.
 		// -1: Infinite. 0: Unavailable. 1~...: As is.
+		[KSPField(isPersistant = false)]
+		public int ignitionsAvailable = -1;
+
+		// Remain ignitionsRemained.
 		[KSPField(isPersistant = true)]
-		public float ignitionsAvailable = -1;
+		public int ignitionsRemained = -1;
 
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Ignitions")]
 		private string ignitionsAvailableString = "Infinite";
@@ -62,6 +66,9 @@ namespace EngineIgnitor
 		// In case we have multiple engines...
 		[KSPField(isPersistant = false)]
 		public int engineIndex = 0;
+
+		[KSPField(isPersistant = false)]
+		public string ignitorType = "type0";
 
 		// List of all engines. So we can pick the one we are corresponding to.
 		private List<ModuleEngines> engines = new List<ModuleEngines>();
@@ -92,6 +99,10 @@ namespace EngineIgnitor
 			else
 				engine = null;
 
+			if (state == StartState.Editor)
+			{
+				ignitionsRemained = ignitionsAvailable;
+			}
 		}
 
 		public override void OnAwake()
@@ -105,24 +116,30 @@ namespace EngineIgnitor
 		public override string GetInfo()
 		{
 			if (ignitionsAvailable != -1)
-				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n";
+				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n" + "Ignitor type: " + ignitorType + "\n";
 			else
-				return "Can ignite for infinite times.\n";
+				return "Can ignite for infinite times.\n" + "Ignitor type: " + ignitorType + "\n";
 		}
 
 		public override void OnUpdate()
 		{
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 
-			if (ignitionsAvailable != -1)
-				ignitionsAvailableString = ignitionsAvailable.ToString();
+			if (ignitionsRemained != -1)
+				ignitionsAvailableString = ignitorType + " - " + ignitionsRemained.ToString() + "/" + ignitionsAvailable.ToString();
 			else
-				ignitionsAvailableString = "Infinite";
+				ignitionsAvailableString = ignitorType + " - " + "Infinite";
 
 			if (part != null)
 				autoIgnitionState = part.temperature.ToString("F1") + "/" + autoIgnitionTemperature.ToString("F1");
 			else
 				autoIgnitionState = "?/" + autoIgnitionTemperature.ToString("F1");
+
+			if (FlightGlobals.ActiveVessel != null)
+			{
+				Events["ReloadIgnitor"].guiActiveUnfocused = (FlightGlobals.ActiveVessel.isEVA == true);
+				Events["ReloadIgnitor"].guiName = "Reload Ignitor (" + ignitionsAvailableString + ")";
+			}
 
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
@@ -153,18 +170,36 @@ namespace EngineIgnitor
 			// Here comes the state transition process.
 			if (oldState == EngineIgnitionState.NOT_IGNITED && engineState == EngineIgnitionState.IGNITED)
 			{
+				bool externalIgnitorAvailable = false;
+				ModuleExternalIgnitor externalIgnitor = null;
+				foreach (ModuleExternalIgnitor extIgnitor in ModuleExternalIgnitor.s_ExternalIgnitors)
+				{
+					if ((extIgnitor.part.orgPos - this.part.orgPos).magnitude < extIgnitor.igniteRange)
+					{
+						if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
+						{
+							externalIgnitorAvailable = true;
+							externalIgnitor = extIgnitor;
+							break;
+						}
+					}
+				}
+
 				// We need to consume one ignitor to light it up.
-				if (ignitionsAvailable > 0 || ignitionsAvailable == -1)
+				if (ignitionsRemained > 0 || ignitionsRemained == -1 || externalIgnitorAvailable == true)
 				{
 					if (ignitorResources.Count > 0)
 					{
 						//Debug.Log("We need to check ignitor resources.");
 						// We need to check if we have all ignitor resources.
 						float minPotential = 1.0f;
-						foreach (IgnitorResource resource in ignitorResources)
+						if (!(externalIgnitorAvailable == true && externalIgnitor.provideRequiredResources == true))
 						{
-							resource.currentAmount = part.RequestResource(resource.name, resource.amount);
-							minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
+							foreach (IgnitorResource resource in ignitorResources)
+							{
+								resource.currentAmount = part.RequestResource(resource.name, resource.amount);
+								minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
+							}
 						}
 
 						bool ignited = (UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential);
@@ -187,18 +222,21 @@ namespace EngineIgnitor
 					}
 
 					// The ignitor device has been used no matter the ignition is successful or not.
-					if(ignitionsAvailable > 0)
-						ignitionsAvailable--;
+					if (externalIgnitorAvailable == false)
+					{
+						if (ignitionsRemained > 0)
+							ignitionsRemained--;
+					}
 				}
-				else if (ignitionsAvailable == 0)
+				else if (ignitionsRemained == 0)
 				{
 					// Oops.
 					engineState = EngineIgnitionState.NOT_IGNITED;
 				}
 				else
-				{ 
+				{
 					// Oooooops.
-					Debug.Log("Invalid IgnitionsAvaiable: " + ignitionsAvailable.ToString());
+					Debug.Log("Invalid Ignitions: " + ignitionsRemained.ToString());
 				}
 			}
 			else if (oldState == EngineIgnitionState.HIGH_TEMP && engineState == EngineIgnitionState.IGNITED)
@@ -208,7 +246,7 @@ namespace EngineIgnitor
 			}
 
 			// Finally we need to handle the thrust generation. i.e. forcibly shutdown the engine when needed.
-			if (engineState == EngineIgnitionState.NOT_IGNITED && (ignitionsAvailable == 0 || preferShutdown == true))
+			if (engineState == EngineIgnitionState.NOT_IGNITED && (ignitionsRemained == 0 || preferShutdown == true))
 			{
 				foreach (BaseEvent baseEvent in engine.Events)
 				{
@@ -218,6 +256,48 @@ namespace EngineIgnitor
 						baseEvent.Invoke();
 					}
 				}
+			}
+		}
+
+		[KSPEvent(name = "ReloadIgnitor", guiName = "Reload Ignitor", active = true, externalToEVAOnly = true, guiActive = false, guiActiveUnfocused = true, unfocusedRange = 3.0f)]
+		public void ReloadIgnitor()
+		{
+			if (ignitionsAvailable == -1 || ignitionsRemained == ignitionsAvailable) return;
+
+			EngineIgnitorUnit availableSource = null;
+			foreach (EngineIgnitorUnit unit in EngineIgnitorUnit.s_IgnitorPacksOnEva)
+			{
+				if (unit.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || unit.ignitorType.Equals(this.ignitorType, StringComparison.CurrentCultureIgnoreCase))
+				{
+					availableSource = unit;
+					break;
+				}
+			}
+
+			if (availableSource == null)
+			{
+				if(EngineIgnitorUnit.s_IgnitorPacksOnEva.Count == 0)
+					ScreenMessages.PostScreenMessage("No nearby ignitor unit.", 4.0f, ScreenMessageStyle.UPPER_CENTER);
+				else
+					ScreenMessages.PostScreenMessage("No matched ignitor unit.", 4.0f, ScreenMessageStyle.UPPER_CENTER);
+			}
+			else
+			{
+				int ignitionReloaded = availableSource.Consume(ignitionsAvailable - ignitionsRemained);
+
+				if (ignitionsRemained == 0 && ignitionReloaded > 0)
+				{
+					// We are reloading from empty state. Prefer to activate the engine.
+					foreach (BaseEvent baseEvent in engine.Events)
+					{
+						//Debug.Log("Engine's event: " + baseEvent.name);
+						if (baseEvent.name.IndexOf("activate", StringComparison.CurrentCultureIgnoreCase) >= 0)
+						{
+							baseEvent.Invoke();
+						}
+					}
+				}
+				ignitionsRemained += ignitionReloaded;
 			}
 		}
 
