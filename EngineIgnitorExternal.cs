@@ -31,5 +31,21 @@ namespace EngineIgnitor
 			}
 		}
 
+		public override void OnUpdate()
+		{
+			if (m_startState != StartState.None && m_startState != StartState.Editor)
+			{
+				if (this.vessel == null)
+				{
+					s_ExternalIgnitors.Remove(this);
+				}
+				else
+				{
+					if (s_ExternalIgnitors.Contains(this) == false)
+						s_ExternalIgnitors.Add(this);
+				}
+			}
+		}
+
 	}
 }

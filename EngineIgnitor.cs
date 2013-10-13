@@ -148,6 +148,7 @@ namespace EngineIgnitor
 			// Record old state.
 			EngineIgnitionState oldState = engineState;
 			// Decide new state.
+			//Debug.Log("Engine: " + engine.requestedThrottle.ToString("F2") + " " + engine.requestedThrust.ToString("F1") + " " + engine.currentThrottle.ToString("F2") + " " + engine.engineShutdown.ToString());
 			if (engine.requestedThrust == 0.0f || engine.engineShutdown == true)
 			{
 				if (engine.part.temperature >= autoIgnitionTemperature)
@@ -167,24 +168,26 @@ namespace EngineIgnitor
 			// This flag is for low-resource state.
 			bool preferShutdown = false;
 
+			bool externalIgnitorAvailable = false;
+			ModuleExternalIgnitor externalIgnitor = null;
+			foreach (ModuleExternalIgnitor extIgnitor in ModuleExternalIgnitor.s_ExternalIgnitors)
+			{
+				//Debug.Log("Iterating external ignitors: " + extIgnitor.part.orgPos.ToString() + " " + engine.thrustTransforms[0].position.ToString());
+				if ((extIgnitor.part.orgPos - engine.thrustTransforms[0].position).magnitude < extIgnitor.igniteRange)
+				{
+					if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
+					{
+						//Debug.Log("External Ignitor Found!");
+						externalIgnitorAvailable = true;
+						externalIgnitor = extIgnitor;
+						break;
+					}
+				}
+			}
+
 			// Here comes the state transition process.
 			if (oldState == EngineIgnitionState.NOT_IGNITED && engineState == EngineIgnitionState.IGNITED)
 			{
-				bool externalIgnitorAvailable = false;
-				ModuleExternalIgnitor externalIgnitor = null;
-				foreach (ModuleExternalIgnitor extIgnitor in ModuleExternalIgnitor.s_ExternalIgnitors)
-				{
-					if ((extIgnitor.part.orgPos - this.part.orgPos).magnitude < extIgnitor.igniteRange)
-					{
-						if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
-						{
-							externalIgnitorAvailable = true;
-							externalIgnitor = extIgnitor;
-							break;
-						}
-					}
-				}
-
 				// We need to consume one ignitor to light it up.
 				if (ignitionsRemained > 0 || ignitionsRemained == -1 || externalIgnitorAvailable == true)
 				{
@@ -246,7 +249,7 @@ namespace EngineIgnitor
 			}
 
 			// Finally we need to handle the thrust generation. i.e. forcibly shutdown the engine when needed.
-			if (engineState == EngineIgnitionState.NOT_IGNITED && (ignitionsRemained == 0 || preferShutdown == true))
+			if (engineState == EngineIgnitionState.NOT_IGNITED && ((ignitionsRemained == 0 && externalIgnitorAvailable == false) || preferShutdown == true))
 			{
 				foreach (BaseEvent baseEvent in engine.Events)
 				{
