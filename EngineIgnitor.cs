@@ -170,7 +170,7 @@ namespace EngineIgnitor
 
 			bool externalIgnitorAvailable = false;
 			ModuleExternalIgnitor externalIgnitor = null;
-			Debug.Log("Check all external ignitors: " + ModuleExternalIgnitor.s_ExternalIgnitors.Count.ToString());
+			//Debug.Log("Check all external ignitors: " + ModuleExternalIgnitor.s_ExternalIgnitors.Count.ToString());
 			for (int i = 0; i < ModuleExternalIgnitor.s_ExternalIgnitors.Count; ++i)
 			{
 				ModuleExternalIgnitor itor = ModuleExternalIgnitor.s_ExternalIgnitors[i];
@@ -185,7 +185,7 @@ namespace EngineIgnitor
 				if (extIgnitor.vessel == null || extIgnitor.vessel.transform == null || extIgnitor.part == null || extIgnitor.part.transform == null)
 					ModuleExternalIgnitor.s_ExternalIgnitors.Remove(extIgnitor);
 
-				Debug.Log("Iterating external ignitors: " + extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos).ToString() + " " + engine.vessel.transform.TransformPoint(engine.part.orgPos).ToString());
+				//Debug.Log("Iterating external ignitors: " + extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos).ToString() + " " + engine.vessel.transform.TransformPoint(engine.part.orgPos).ToString());
 				if ((extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos) - engine.vessel.transform.TransformPoint(engine.part.orgPos)).magnitude < extIgnitor.igniteRange)
 				{
 					if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
