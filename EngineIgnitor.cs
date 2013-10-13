@@ -170,10 +170,23 @@ namespace EngineIgnitor
 
 			bool externalIgnitorAvailable = false;
 			ModuleExternalIgnitor externalIgnitor = null;
+			Debug.Log("Check all external ignitors: " + ModuleExternalIgnitor.s_ExternalIgnitors.Count.ToString());
+			for (int i = 0; i < ModuleExternalIgnitor.s_ExternalIgnitors.Count; ++i)
+			{
+				ModuleExternalIgnitor itor = ModuleExternalIgnitor.s_ExternalIgnitors[i];
+				if (itor.vessel == null || itor.vessel.transform == null || itor.part == null || itor.part.transform == null)
+				{
+					ModuleExternalIgnitor.s_ExternalIgnitors.RemoveAt(i);
+					--i;
+				}
+			}
 			foreach (ModuleExternalIgnitor extIgnitor in ModuleExternalIgnitor.s_ExternalIgnitors)
 			{
-				//Debug.Log("Iterating external ignitors: " + extIgnitor.part.orgPos.ToString() + " " + engine.thrustTransforms[0].position.ToString());
-				if ((extIgnitor.part.orgPos - engine.thrustTransforms[0].position).magnitude < extIgnitor.igniteRange)
+				if (extIgnitor.vessel == null || extIgnitor.vessel.transform == null || extIgnitor.part == null || extIgnitor.part.transform == null)
+					ModuleExternalIgnitor.s_ExternalIgnitors.Remove(extIgnitor);
+
+				Debug.Log("Iterating external ignitors: " + extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos).ToString() + " " + engine.vessel.transform.TransformPoint(engine.part.orgPos).ToString());
+				if ((extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos) - engine.vessel.transform.TransformPoint(engine.part.orgPos)).magnitude < extIgnitor.igniteRange)
 				{
 					if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
 					{

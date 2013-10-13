@@ -27,7 +27,8 @@ namespace EngineIgnitor
 
 			if (state != StartState.None && state != StartState.Editor)
 			{
-				s_ExternalIgnitors.Add(this);
+				if(s_ExternalIgnitors.Contains(this) == false)
+					s_ExternalIgnitors.Add(this);
 			}
 		}
 
