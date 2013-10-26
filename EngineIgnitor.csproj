@@ -50,10 +50,12 @@
     <Compile Include="EngineIgnitorUnit.cs" />
     <Compile Include="EngineIgnitorExternal.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="UllageSimulator.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /y $(TargetFileName) "E:\Kerbal Space Program v0.21\GameData\TweakableParam\Plugins\"</PostBuildEvent>
+    <PostBuildEvent>copy /y $(TargetFileName) "E:\Kerbal Space Program v0.21\GameData\EngineIgnitor\Plugins\"
+copy /y $(TargetFileName) "E:\Kerbal Space Program v0.22\GameData\EngineIgnitor\Plugins\"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

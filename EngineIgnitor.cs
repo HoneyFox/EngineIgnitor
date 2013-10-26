@@ -6,6 +6,34 @@ using UnityEngine;
 
 namespace EngineIgnitor
 {
+	[System.Serializable]
+	public class IgnitorResource
+	{
+		public string name;
+		public float amount;
+		public float currentAmount;
+
+		public IgnitorResource()
+		{
+		}
+
+		public void Load(ConfigNode node)
+		{
+			name = node.GetValue("name");
+
+			if (node.HasValue("amount"))
+			{
+				amount = Mathf.Max(0.0f, float.Parse(node.GetValue("amount")));
+			}
+		}
+
+		public void Save(ConfigNode node)
+		{
+			node.AddValue("name", name);
+			node.AddValue("amount", Mathf.Max(0.0f, amount));
+		}
+	}
+
 	public class ModuleEngineIgnitor : PartModule
 	{
 		public enum EngineIgnitionState
@@ -15,35 +43,7 @@ namespace EngineIgnitor
 			HIGH_TEMP = 1,
 			IGNITED = 2,
 		}
-
-		[System.Serializable]
-		public class IgnitorResource
-		{
-			public string name;
-			public float amount;
-			public float currentAmount;
-
-			public IgnitorResource()
-			{ 
-			}
-
-			public void Load(ConfigNode node)
-			{
-				name = node.GetValue("name");
-
-				if (node.HasValue("amount"))
-				{
-					amount = Mathf.Max(0.0f, float.Parse(node.GetValue("amount")));
-				}
-			}
-
-			public void Save(ConfigNode node)
-			{
-				node.AddValue("name", name);
-				node.AddValue("amount", Mathf.Max(0.0f, amount));
-			}
-		}
-
+		
 		// We can ignite as many times as we want by default.
 		// -1: Infinite. 0: Unavailable. 1~...: As is.
 		[KSPField(isPersistant = false)]
@@ -70,6 +70,12 @@ namespace EngineIgnitor
 		[KSPField(isPersistant = false)]
 		public string ignitorType = "type0";
 
+		[KSPField(isPersistant = false)]
+		public bool useUllageSimulation = true;
+
+		[KSPField(isPersistant = false, guiActive = true, guiName = "Fuel Flow")]
+		private string ullageState = "Very Stable";
+
 		// List of all engines. So we can pick the one we are corresponding to.
 		private List<ModuleEngines> engines = new List<ModuleEngines>();
 
@@ -81,6 +87,7 @@ namespace EngineIgnitor
 		private EngineIgnitionState engineState = EngineIgnitionState.INVALID;
 
 		private StartState m_startState = StartState.None;
+		private UllageSimulator m_ullageSimulator = new UllageSimulator();
 		public List<IgnitorResource> ignitorResources;
 
 		public override void OnStart(StartState state)
@@ -103,6 +110,12 @@ namespace EngineIgnitor
 			{
 				ignitionsRemained = ignitionsAvailable;
 			}
+
+			m_ullageSimulator.Reset();
+			if (useUllageSimulation == false || UllageSimulator.s_SimulateUllage == false)
+			{
+				Fields["Fuel Flow"].guiActive = false;
+			}
 		}
 
 		public override void OnAwake()
@@ -119,6 +132,22 @@ namespace EngineIgnitor
 				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n" + "Ignitor type: " + ignitorType + "\n";
 			else
 				return "Can ignite for infinite times.\n" + "Ignitor type: " + ignitorType + "\n";
+		}
+
+		public bool IsEngineActivated()
+		{
+			foreach (BaseEvent baseEvent in engine.Events)
+			{
+				//Debug.Log("Engine's event: " + baseEvent.name);
+				if (baseEvent.name.IndexOf("shutdown", StringComparison.CurrentCultureIgnoreCase) >= 0)
+				{
+					//Debug.Log("IsEngineActivated: " + baseEvent.name + " " + baseEvent.active.ToString() + " " + baseEvent.guiActive.ToString());
+					if (baseEvent.active == true)
+						return true;
+				}
+			}
+
+			return false;
 		}
 
 		public override void OnUpdate()
@@ -141,15 +170,22 @@ namespace EngineIgnitor
 				Events["ReloadIgnitor"].guiName = "Reload Ignitor (" + ignitionsAvailableString + ")";
 			}
 
+			// Update ullage.
+			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime);
+			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability();
+
+			ullageState = m_ullageSimulator.GetFuelFlowState();
+
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
 			if (engine.allowShutdown == false) return;
 
+			
 			// Record old state.
 			EngineIgnitionState oldState = engineState;
 			// Decide new state.
 			//Debug.Log("Engine: " + engine.requestedThrottle.ToString("F2") + " " + engine.requestedThrust.ToString("F1") + " " + engine.currentThrottle.ToString("F2") + " " + engine.engineShutdown.ToString());
-			if (engine.requestedThrust == 0.0f || engine.engineShutdown == true)
+			if (engine.requestedThrust == 0.0f || IsEngineActivated() == false)
 			{
 				if (engine.part.temperature >= autoIgnitionTemperature)
 				{
@@ -217,6 +253,18 @@ namespace EngineIgnitor
 								minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
 							}
 						}
+						else
+						{
+							if (externalIgnitorAvailable == true)
+							{
+								externalIgnitor.ConsumeResource();
+							}
+						}
+
+						if (UllageSimulator.s_SimulateUllage == true && useUllageSimulation == true)
+						{
+							minPotential *= fuelFlowStability;
+						}
 
 						bool ignited = (UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential);
 						Debug.Log("Potential = " + minPotential.ToString("F2") + " Ignited: " + ignited.ToString());
@@ -241,7 +289,10 @@ namespace EngineIgnitor
 					if (externalIgnitorAvailable == false)
 					{
 						if (ignitionsRemained > 0)
+						{
+							//Debug.Log("Ignitor consumed: " + oldState.ToString() + " " + engineState.ToString() + " " + engine.requestedThrust.ToString("F2") + " " + IsEngineActivated().ToString());
 							ignitionsRemained--;
+						}
 					}
 				}
 				else if (ignitionsRemained == 0)
@@ -264,12 +315,60 @@ namespace EngineIgnitor
 			// Finally we need to handle the thrust generation. i.e. forcibly shutdown the engine when needed.
 			if (engineState == EngineIgnitionState.NOT_IGNITED && ((ignitionsRemained == 0 && externalIgnitorAvailable == false) || preferShutdown == true))
 			{
-				foreach (BaseEvent baseEvent in engine.Events)
+				if (IsEngineActivated() == true)
 				{
-					//Debug.Log("Engine's event: " + baseEvent.name);
-					if (baseEvent.name.IndexOf("shutdown", StringComparison.CurrentCultureIgnoreCase) >= 0)
+					vessel.ctrlState.mainThrottle = 0.0f;
+					engine.SetRunningGroupsActive(false);
+					foreach (BaseEvent baseEvent in engine.Events)
 					{
-						baseEvent.Invoke();
+						//Debug.Log("Engine's event: " + baseEvent.name);
+						if (baseEvent.name.IndexOf("shutdown", StringComparison.CurrentCultureIgnoreCase) >= 0)
+						{
+							baseEvent.Invoke();
+						}
+					}
+					engine.SetRunningGroupsActive(false);
+				}
+			}
+			else if (engineState == EngineIgnitionState.IGNITED)
+			{
+				if (useUllageSimulation == true)
+				{
+					if (UllageSimulator.s_ShutdownEngineWhenUnstable == true)
+					{
+						float FuelFlowPotential = Mathf.Pow(fuelFlowStability, 0.03f);
+						bool failed = (UnityEngine.Random.Range(0.0f, 1.0f) > FuelFlowPotential);
+						if (FuelFlowPotential < 1.0f)
+							Debug.Log("FuelFlowPotential = " + FuelFlowPotential.ToString("F2") + " Failed: " + failed.ToString());
+						if (failed == true)
+						{
+							if (UllageSimulator.s_ExplodeEngineWhenTooUnstable == true)
+							{
+								float ExplodePotential = Mathf.Pow(fuelFlowStability, 0.01f) + 0.01f;
+								bool exploded = (UnityEngine.Random.Range(0.0f, 1.0f) > ExplodePotential);
+								if (ExplodePotential < 1.0f)
+									Debug.Log("ExplodePotential = " + ExplodePotential.ToString("F2") + " Exploded: " + exploded.ToString());
+								if (exploded)
+								{
+									engine.part.explode();
+								}
+							}
+
+							if (IsEngineActivated() == true)
+							{
+								vessel.ctrlState.mainThrottle = 0.0f;
+								engine.SetRunningGroupsActive(false);
+								foreach (BaseEvent baseEvent in engine.Events)
+								{
+									//Debug.Log("Engine's event: " + baseEvent.name);
+									if (baseEvent.name.IndexOf("shutdown", StringComparison.CurrentCultureIgnoreCase) >= 0)
+									{
+										baseEvent.Invoke();
+									}
+								}
+								engine.SetRunningGroupsActive(false);
+							}
+						}
 					}
 				}
 			}
