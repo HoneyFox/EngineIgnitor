@@ -58,7 +58,7 @@ namespace EngineIgnitor
 				}
 			}
 
-			Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
+			//Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
 			
 			// Natural diffusion.
 			ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, 0.01f * deltaTime);
@@ -100,33 +100,35 @@ namespace EngineIgnitor
 			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * 0.006f, 0.0f, 0.9f);
 			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * 0.003f, 0.1f, 1.0f);
 
-			Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
+			//Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
 		}
 
 		public float GetFuelFlowStability()
 		{
 			float bLevel = Mathf.Clamp((ullageHeightMax - ullageHeightMin) * (ullageRadialMax - ullageRadialMin) / 0.1f - 1.0f, 0.0f, 10.0f);
-			Debug.Log("Ullage: bLevel: " + bLevel.ToString("F3"));
+			//Debug.Log("Ullage: bLevel: " + bLevel.ToString("F3"));
 	
 			float pVertical = 1.0f;
 			pVertical = 1.0f - (ullageHeightMin - 0.1f) / 0.2f;
 			pVertical = Mathf.Clamp01(pVertical);
-			Debug.Log("Ullage: pVertical: " + pVertical.ToString("F3"));
+			//Debug.Log("Ullage: pVertical: " + pVertical.ToString("F3"));
 	
 			float pHorizontal = 1.0f;
 			pHorizontal = 1.0f - (ullageRadialMin - 0.1f) / 0.2f;
 			pHorizontal = Mathf.Clamp01(pHorizontal);
-			Debug.Log("Ullage: pHorizontal: " + pHorizontal.ToString("F3"));
+			//Debug.Log("Ullage: pHorizontal: " + pHorizontal.ToString("F3"));
 
 			float successProbability = Mathf.Max(0.0f, 1.0f - (pVertical * pHorizontal * (0.75f + bLevel)));
 
-			if (successProbability >= 0.99f)
+			if (successProbability >= 0.996f)
 				fuelFlowState = "Very Stable";
-			else if (successProbability >= 0.90f)
+			else if (successProbability >= 0.95f)
 				fuelFlowState = "Stable";
 			else if (successProbability >= 0.75f)
 				fuelFlowState = "Risky";
-			else if (successProbability >= 0.60f)
+			else if (successProbability >= 0.50f)
+				fuelFlowState = "Very Risky";
+			else if (successProbability >= 0.30f)
 				fuelFlowState = "Unstable";
 			else
 				fuelFlowState = "Very Unstable";
