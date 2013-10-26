@@ -114,7 +114,7 @@ namespace EngineIgnitor
 			m_ullageSimulator.Reset();
 			if (useUllageSimulation == false || UllageSimulator.s_SimulateUllage == false)
 			{
-				Fields["Fuel Flow"].guiActive = false;
+				ullageState = "Very Stable";
 			}
 		}
 
@@ -174,7 +174,8 @@ namespace EngineIgnitor
 			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime);
 			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability();
 
-			ullageState = m_ullageSimulator.GetFuelFlowState();
+			if(useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
+				ullageState = m_ullageSimulator.GetFuelFlowState();
 
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
