@@ -12,6 +12,23 @@ namespace EngineIgnitor
 		public static bool s_ShutdownEngineWhenUnstable = true;
 		public static bool s_ExplodeEngineWhenTooUnstable = false;
 
+		
+		public static float s_NaturalDiffusionRateX = 0.02f;
+		public static float s_NaturalDiffusionRateY = 0.03f;
+
+		public static float s_TranslateAxialCoefficientX = 0.06f;
+		public static float s_TranslateAxialCoefficientY = 0.06f;
+
+		public static float s_TranslateSidewayCoefficientX = 0.04f;
+		public static float s_TranslateSidewayCoefficientY = 0.02f;
+
+		public static float s_RotateYawPitchCoefficientX = 0.003f;
+		public static float s_RotateYawPitchCoefficientY = 0.004f;
+
+		public static float s_RotateRollCoefficientX = 0.005f;
+		public static float s_RotateRollCoefficientY = 0.006f;
+
+
 		float ullageHeightMin, ullageHeightMax;
 		float ullageRadialMin, ullageRadialMax;
 
@@ -61,44 +78,44 @@ namespace EngineIgnitor
 			//Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
 			
 			// Natural diffusion.
-			ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, 0.01f * deltaTime);
-			ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, 0.01f * deltaTime);
-			ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, 0.02f * deltaTime);
-			ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, 0.02f * deltaTime);
+			ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * deltaTime);
+			ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * deltaTime);
+			ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * deltaTime);
+			ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * deltaTime);
 
 			// Translate forward/backward.
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * 0.06f, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + localAccelerationAmount.y * 0.06f, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(localAccelerationAmount.y) * 0.06f, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax + Mathf.Abs(localAccelerationAmount.y) * 0.06f, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + localAccelerationAmount.y * s_TranslateAxialCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax + Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX, 0.1f, 1.0f);
 
 			// Translate up/down/left/right.
 			Vector3 sideAcc = new Vector3(localAccelerationAmount.x, 0.0f, localAccelerationAmount.z);
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin - sideAcc.magnitude * 0.02f, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + sideAcc.magnitude * 0.02f, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin + sideAcc.magnitude * 0.04f, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax + sideAcc.magnitude * 0.04f, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin - sideAcc.magnitude * s_TranslateSidewayCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + sideAcc.magnitude * s_TranslateSidewayCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin + sideAcc.magnitude * s_TranslateSidewayCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax + sideAcc.magnitude * s_TranslateSidewayCoefficientX, 0.1f, 1.0f);
 
 			// Rotate yaw/pitch.
 			Vector3 rotateYawPitch = new Vector3(rotation.x, 0.0f, rotation.z);
 			if(ullageHeightMin < 0.45)
-				ullageHeightMin = Mathf.Clamp(ullageHeightMin + rotateYawPitch.magnitude * 0.004f, 0.0f, 0.45f);
+				ullageHeightMin = Mathf.Clamp(ullageHeightMin + rotateYawPitch.magnitude * s_RotateYawPitchCoefficientY, 0.0f, 0.45f);
 			else
-				ullageHeightMin = Mathf.Clamp(ullageHeightMin - rotateYawPitch.magnitude * 0.004f, 0.45f, 0.9f);
+				ullageHeightMin = Mathf.Clamp(ullageHeightMin - rotateYawPitch.magnitude * s_RotateYawPitchCoefficientY, 0.45f, 0.9f);
 
 			if (ullageHeightMax < 0.55)
-				ullageHeightMax = Mathf.Clamp(ullageHeightMax + rotateYawPitch.magnitude * 0.004f, 0.1f, 0.55f);
+				ullageHeightMax = Mathf.Clamp(ullageHeightMax + rotateYawPitch.magnitude * s_RotateYawPitchCoefficientY, 0.1f, 0.55f);
 			else
-				ullageHeightMax = Mathf.Clamp(ullageHeightMax - rotateYawPitch.magnitude * 0.004f, 0.55f, 1.0f);
+				ullageHeightMax = Mathf.Clamp(ullageHeightMax - rotateYawPitch.magnitude * s_RotateYawPitchCoefficientY, 0.55f, 1.0f);
 
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin - rotateYawPitch.magnitude * 0.002f, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax + rotateYawPitch.magnitude * 0.004f, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin - rotateYawPitch.magnitude * s_RotateYawPitchCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax + rotateYawPitch.magnitude * s_RotateYawPitchCoefficientX, 0.1f, 1.0f);
 			
 			// Rotate roll.
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin - Mathf.Abs(rotation.y) * 0.006f, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + Mathf.Abs(rotation.y) * 0.006f, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * 0.006f, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * 0.003f, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + Mathf.Abs(rotation.y) * s_RotateRollCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX, 0.1f, 1.0f);
 
 			//Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
 		}
@@ -117,9 +134,9 @@ namespace EngineIgnitor
 			pHorizontal = 1.0f - (ullageRadialMin - 0.1f) / 0.2f;
 			pHorizontal = Mathf.Clamp01(pHorizontal);
 			//Debug.Log("Ullage: pHorizontal: " + pHorizontal.ToString("F3"));
-
-			float successProbability = Mathf.Max(0.0f, 1.0f - (pVertical * pHorizontal * (0.75f + bLevel)));
-
+			
+			float successProbability = Mathf.Max(0.0f, 1.0f - (pVertical * pHorizontal * (0.75f + Mathf.Sqrt(bLevel))));
+			
 			if (successProbability >= 0.996f)
 				fuelFlowState = "Very Stable";
 			else if (successProbability >= 0.95f)

@@ -223,7 +223,30 @@ namespace EngineIgnitor
 					ModuleExternalIgnitor.s_ExternalIgnitors.Remove(extIgnitor);
 
 				//Debug.Log("Iterating external ignitors: " + extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos).ToString() + " " + engine.vessel.transform.TransformPoint(engine.part.orgPos).ToString());
-				if ((extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos) - engine.vessel.transform.TransformPoint(engine.part.orgPos)).magnitude < extIgnitor.igniteRange)
+				bool inRange = (extIgnitor.vessel.transform.TransformPoint(extIgnitor.part.orgPos) - engine.vessel.transform.TransformPoint(engine.part.orgPos)).magnitude < extIgnitor.igniteRange;
+				bool isAttached = false;
+				foreach(AttachNode attachNode in extIgnitor.part.attachNodes)
+				{
+					if(attachNode.attachedPart == engine.part)
+					{
+						isAttached = true;
+						break;
+					}
+				}
+				foreach (Part childPart in extIgnitor.part.children)
+				{
+					if (childPart == engine.part)
+					{
+						isAttached = true;
+						break;
+					}
+				}
+				if (extIgnitor.attachedPart == engine.part)
+				{
+					isAttached = true;
+				}
+
+				if (inRange || isAttached)
 				{
 					if (extIgnitor.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || extIgnitor.ignitorType.Equals(ignitorType, StringComparison.CurrentCultureIgnoreCase))
 					{

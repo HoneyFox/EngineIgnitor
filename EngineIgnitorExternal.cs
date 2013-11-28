@@ -34,6 +34,10 @@ namespace EngineIgnitor
 		private StartState m_startState = StartState.None;
 		public List<IgnitorResource> ignitorResources;
 
+		public Part attachedPart = null;
+		private const int CLEAR_ATTACHED_PART_DELAY = 10;
+		private int clearAttachedPartDelay = CLEAR_ATTACHED_PART_DELAY;
+
 		public override void OnStart(StartState state)
 		{
 			m_startState = state;
@@ -43,7 +47,7 @@ namespace EngineIgnitor
 				if(s_ExternalIgnitors.Contains(this) == false)
 					s_ExternalIgnitors.Add(this);
 			}
-
+			
 			if (state == StartState.Editor)
 			{
 				ignitionsRemained = ignitionsAvailable;
@@ -62,6 +66,22 @@ namespace EngineIgnitor
 		{
 			if (m_startState != StartState.None && m_startState != StartState.Editor)
 			{
+				if (this.part.parent != null)
+				{
+					attachedPart = this.part.parent;
+					clearAttachedPartDelay = CLEAR_ATTACHED_PART_DELAY;
+				}
+				else
+				{
+					if (clearAttachedPartDelay > 0)
+						clearAttachedPartDelay--;
+
+					if (clearAttachedPartDelay == 0)
+					{
+						attachedPart = null;
+					}
+				}
+
 				if (ignitionsRemained != -1)
 					ignitionsAvailableString = ignitorType + " - " + ignitionsRemained.ToString() + "/" + ignitionsAvailable.ToString();
 				else
