@@ -128,29 +128,10 @@ namespace EngineIgnitor
 
 		public override string GetInfo()
 		{
-			string resourceRequired = "";
-			if(ignitorResources.Count > 0)
-			{
-				resourceRequired = "Require resource(s): ";
-				for(int i = 0; i < ignitorResources.Count; ++i)
-				{
-					IgnitorResource resource = ignitorResources[i];
-					resourceRequired += resource.name + "(" + resource.amount.ToString("F3") + ")";
-					if(i != ignitorResources.Count - 1)
-					{
-						resourceRequired += ", ";
-					}
-					else
-					{
-						resourceRequired += ".";
-					}
-				}
-			}
-
 			if (ignitionsAvailable != -1)
-				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n" + "Ignitor type: " + ignitorType + "\n" + resourceRequired;
+				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n" + "Ignitor type: " + ignitorType + "\n";
 			else
-				return "Can ignite for infinite times.\n" + "Ignitor type: " + ignitorType + "\n" + resourceRequired;
+				return "Can ignite for infinite times.\n" + "Ignitor type: " + ignitorType + "\n";
 		}
 
 		public bool IsEngineActivated()
