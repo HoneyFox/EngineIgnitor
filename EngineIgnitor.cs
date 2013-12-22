@@ -6,11 +6,14 @@ using UnityEngine;
 
 namespace EngineIgnitor
 {
-	[System.Serializable]
-	public class IgnitorResource
+	[Serializable]
+	public class IgnitorResource : IConfigNode
 	{
+		[SerializeField]
 		public string name;
+		[SerializeField]
 		public float amount;
+
 		public float currentAmount;
 
 		public IgnitorResource()
@@ -87,6 +90,7 @@ namespace EngineIgnitor
 		private EngineIgnitionState engineState = EngineIgnitionState.INVALID;
 
 		private StartState m_startState = StartState.None;
+		private bool m_isEngineMouseOver = false;
 		private UllageSimulator m_ullageSimulator = new UllageSimulator();
 		public List<IgnitorResource> ignitorResources;
 
@@ -116,6 +120,11 @@ namespace EngineIgnitor
 			{
 				ullageState = "Very Stable";
 			}
+
+			if (ignitorResources == null || ignitorResources.Count == 0)
+			{
+				//OnLoad(part.partInfo.internalConfig);
+			}
 		}
 
 		public override void OnAwake()
@@ -132,6 +141,55 @@ namespace EngineIgnitor
 				return "Can ignite for " + ignitionsAvailable.ToString() + " time(s).\n" + "Ignitor type: " + ignitorType + "\n";
 			else
 				return "Can ignite for infinite times.\n" + "Ignitor type: " + ignitorType + "\n";
+		}
+
+		public void OnMouseEnter()
+		{
+			if (HighLogic.LoadedSceneIsEditor)
+			{
+				//Debug.Log("ModuleEngineIgnitor: OnMouseEnter()");
+				m_isEngineMouseOver = true;
+			}
+		}
+
+		public void OnMouseExit()
+		{
+			if (HighLogic.LoadedSceneIsEditor)
+			{
+				//Debug.Log("ModuleEngineIgnitor: OnMouseExit()");
+				m_isEngineMouseOver = false;
+			}
+		}
+
+		void OnGUI()
+		{
+			//Debug.Log("ModuleEngineIgnitor: OnGUI() " + ignitorResources.Count.ToString());
+			if (m_isEngineMouseOver == false) return;
+			string resourceRequired = "";
+			if(ignitorResources.Count > 0)
+			{
+				resourceRequired = "Ignition requires: ";
+				for(int i = 0; i < ignitorResources.Count; ++i)
+				{
+					IgnitorResource resource = ignitorResources[i];
+					resourceRequired += resource.name + "(" + resource.amount.ToString("F3") + ")";
+					if(i != ignitorResources.Count - 1)
+					{
+						resourceRequired += ", ";
+					}
+					else
+					{
+						resourceRequired += ".";
+					}
+				}
+			}
+
+			Vector2 screenCoords = Camera.main.WorldToScreenPoint(part.transform.position);
+			Rect ignitorResourceListRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y, 200.0f, 40.0f);
+			GUIStyle listStyle = new GUIStyle();
+			listStyle.alignment = TextAnchor.MiddleCenter;
+			listStyle.normal.textColor = Color.red;
+			GUI.Label(ignitorResourceListRect, resourceRequired, listStyle);
 		}
 
 		public bool IsEngineActivated()
@@ -453,9 +511,25 @@ namespace EngineIgnitor
 		{
 			base.OnLoad(node);
 
-			if (ignitorResources != null)
-				ignitorResources = new List<IgnitorResource>();
+			//if (ignitorResources != null)
+			ignitorResources = new List<IgnitorResource>();
 
+			foreach (ConfigNode subNode in node.GetNodes("IGNITOR_RESOURCE"))
+			{
+				//Debug.Log("IgnitorResource node found.");
+				if (subNode.HasValue("name") == false || subNode.HasValue("amount") == false)
+				{
+					//Debug.Log("Ignitor Resource must have \'name\' and \'amount\'.");
+					continue;
+				}
+				IgnitorResource newIgnitorResource = new IgnitorResource();
+				newIgnitorResource.Load(subNode);
+				//Debug.Log("IgnitorResource added: " + newIgnitorResource.name + " " + newIgnitorResource.amount.ToString("F2"));
+				ignitorResources.Add(newIgnitorResource);
+			}
+
+			#region Old and wrong codes...
+			/*
 			if (part.partInfo != null)
 			{
 				ConfigNode origNode = null;
@@ -498,7 +572,8 @@ namespace EngineIgnitor
 				}
 			}
 			//Debug.Log("Total ignitor resources: " + ignitorResources.Count.ToString());
-
+			*/
+			#endregion
 		}
 	}
 }
