@@ -483,12 +483,20 @@ namespace EngineIgnitor
 			if (ignitionsAvailable == -1 || ignitionsRemained == ignitionsAvailable) return;
 
 			EngineIgnitorUnit availableSource = null;
-			foreach (EngineIgnitorUnit unit in EngineIgnitorUnit.s_IgnitorPacksOnEva)
+			for(int i = 0; i < EngineIgnitorUnit.s_IgnitorPacksOnEva.Count; ++i)
 			{
-				if (unit.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || unit.ignitorType.Equals(this.ignitorType, StringComparison.CurrentCultureIgnoreCase))
+				EngineIgnitorUnit unit = EngineIgnitorUnit.s_IgnitorPacksOnEva[i];
+				if (unit.vessel != null && unit.vessel.isActiveVessel == true && unit.vessel.isEVA == true && unit.ignitors != 0)
 				{
-					availableSource = unit;
-					break;
+					if (unit.ignitorType.Equals("universal", StringComparison.CurrentCultureIgnoreCase) || unit.ignitorType.Equals(this.ignitorType, StringComparison.CurrentCultureIgnoreCase))
+					{
+						availableSource = unit;
+					}
+				}
+				else
+				{
+					EngineIgnitorUnit.s_IgnitorPacksOnEva.Remove(unit);
+					i--;
 				}
 			}
 
