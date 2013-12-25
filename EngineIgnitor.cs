@@ -35,6 +35,20 @@ namespace EngineIgnitor
 			node.AddValue("name", name);
 			node.AddValue("amount", Mathf.Max(0.0f, amount));
 		}
+
+		public override string ToString()
+		{
+			return name + "(" + amount.ToString("F3") + ")";
+		}
+
+		public static IgnitorResource FromString(string str)
+		{
+			IgnitorResource ir = new IgnitorResource();
+			int indexL = str.LastIndexOf('('); int indexR = str.LastIndexOf(')');
+			ir.name = str.Substring(0, indexL);
+			ir.amount = float.Parse(str.Substring(indexL + 1, indexR - indexL - 1));
+			return ir;
+		}
 	}
 
 	public class ModuleEngineIgnitor : PartModule
@@ -92,12 +106,15 @@ namespace EngineIgnitor
 		private StartState m_startState = StartState.None;
 		private bool m_isEngineMouseOver = false;
 		private UllageSimulator m_ullageSimulator = new UllageSimulator();
+
+		public List<string> ignitorResourcesStr;
 		public List<IgnitorResource> ignitorResources;
 
 		public override void OnStart(StartState state)
 		{
 			m_startState = state;
 
+			engines.Clear();
 			foreach (PartModule module in this.part.Modules)
 			{
 				if (module is ModuleEngines)
@@ -121,9 +138,11 @@ namespace EngineIgnitor
 				ullageState = "Very Stable";
 			}
 
-			if (ignitorResources == null || ignitorResources.Count == 0)
+			//Debug.Log("Restoring them from strings.");
+			ignitorResources.Clear();
+			foreach (string str in ignitorResourcesStr)
 			{
-				//OnLoad(part.partInfo.internalConfig);
+				ignitorResources.Add(IgnitorResource.FromString(str));
 			}
 		}
 
@@ -133,6 +152,8 @@ namespace EngineIgnitor
 
 			if (ignitorResources == null)
 				ignitorResources = new List<IgnitorResource>();
+			if (ignitorResourcesStr == null)
+				ignitorResourcesStr = new List<string>();
 		}
 
 		public override string GetInfo()
@@ -510,8 +531,9 @@ namespace EngineIgnitor
 		public override void OnLoad(ConfigNode node)
 		{
 			base.OnLoad(node);
-
+			
 			//if (ignitorResources != null)
+			ignitorResourcesStr = new List<string>();
 			ignitorResources = new List<IgnitorResource>();
 
 			foreach (ConfigNode subNode in node.GetNodes("IGNITOR_RESOURCE"))
@@ -526,6 +548,7 @@ namespace EngineIgnitor
 				newIgnitorResource.Load(subNode);
 				//Debug.Log("IgnitorResource added: " + newIgnitorResource.name + " " + newIgnitorResource.amount.ToString("F2"));
 				ignitorResources.Add(newIgnitorResource);
+				ignitorResourcesStr.Add(newIgnitorResource.ToString());
 			}
 
 			#region Old and wrong codes...
