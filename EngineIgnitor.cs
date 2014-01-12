@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Reflection;
 using UnityEngine;
 
 namespace EngineIgnitor
@@ -90,14 +91,17 @@ namespace EngineIgnitor
 		[KSPField(isPersistant = false)]
 		public bool useUllageSimulation = true;
 
+		[KSPField(isPersistant = false)]
+		public bool isPressureFed = false;
+
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Fuel Flow")]
 		private string ullageState = "Very Stable";
 
 		// List of all engines. So we can pick the one we are corresponding to.
-		private List<ModuleEngines> engines = new List<ModuleEngines>();
+		private List<EngineWrapper> engines = new List<EngineWrapper>();
 
 		// And that's it.
-		private ModuleEngines engine = null;
+		private EngineWrapper engine = null;
 
 		// A state for the FSM.
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Engine State")]
@@ -119,7 +123,11 @@ namespace EngineIgnitor
 			{
 				if (module is ModuleEngines)
 				{
-					engines.Add(module as ModuleEngines);
+					engines.Add(new EngineWrapper(module as ModuleEngines));
+				}
+				else if (module is ModuleEnginesFX)
+				{
+					engines.Add(new EngineWrapper(module as ModuleEnginesFX));
 				}
 			}
 			if (engines.Count > engineIndex)
@@ -186,6 +194,13 @@ namespace EngineIgnitor
 		{
 			//Debug.Log("ModuleEngineIgnitor: OnGUI() " + ignitorResources.Count.ToString());
 			if (m_isEngineMouseOver == false) return;
+
+			string ignitorInfo = "Ignitor: ";
+			if (ignitionsRemained == -1)
+				ignitorInfo += ignitorType + "(Infinite)";
+			else
+				ignitorInfo += ignitorType + "(" + ignitionsRemained.ToString() + ")";
+
 			string resourceRequired = "";
 			if(ignitorResources.Count > 0)
 			{
@@ -205,12 +220,37 @@ namespace EngineIgnitor
 				}
 			}
 
+			string ullageInfo = "";
+			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
+			{
+				ullageInfo = "Need settling down fuel before ignition.";
+				if (isPressureFed == true)
+				{
+					ullageInfo = "Pressure fed. Need pressurized fuel tanks.";
+				}
+			}
+			else
+			{
+				ullageInfo = "Ullage simulation disabled.";
+			}
+
 			Vector2 screenCoords = Camera.main.WorldToScreenPoint(part.transform.position);
-			Rect ignitorResourceListRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y, 200.0f, 40.0f);
+			Rect ignitorInfoRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y - 30.0f, 200.0f, 20.0f);
+			GUIStyle ignitorInfoStyle = new GUIStyle();
+			ignitorInfoStyle.alignment = TextAnchor.MiddleCenter;
+			ignitorInfoStyle.normal.textColor = Color.red;
+			GUI.Label(ignitorInfoRect, ignitorInfo, ignitorInfoStyle);
+			Rect ignitorResourceListRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y - 10.0f, 200.0f, 20.0f);
 			GUIStyle listStyle = new GUIStyle();
 			listStyle.alignment = TextAnchor.MiddleCenter;
 			listStyle.normal.textColor = Color.red;
 			GUI.Label(ignitorResourceListRect, resourceRequired, listStyle);
+			Rect ullageInfoRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y + 10.0f, 200.0f, 20.0f);
+			GUIStyle ullageInfoStyle = new GUIStyle();
+			ullageInfoStyle.alignment = TextAnchor.MiddleCenter;
+			ullageInfoStyle.normal.textColor = Color.blue;
+			GUI.Label(ullageInfoRect, ullageInfo, ullageInfoStyle);
+
 		}
 
 		public bool IsEngineActivated()
@@ -253,8 +293,65 @@ namespace EngineIgnitor
 			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime);
 			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability();
 
-			if(useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
-				ullageState = m_ullageSimulator.GetFuelFlowState();
+			bool fuelPressurized = true;
+			foreach(Propellant p in engine.propellants)
+			{
+				bool foundPressurizedSource = false;
+				List<PartResource> resourceSources = new List<PartResource>();
+				engine.part.GetConnectedResources(p.id, resourceSources);
+				foreach (PartResource pr in resourceSources)
+				{
+					//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
+					if (IsModularFuelTankPressurizedFor(pr) == true)
+					{
+						foundPressurizedSource = true;
+						break;
+					}
+				}
+
+				if (foundPressurizedSource == false)
+				{
+					fuelPressurized = false;
+					break;
+				}
+			}
+
+			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
+			{
+				if (isPressureFed == true)
+				{
+					if (fuelPressurized == true)
+					{
+						ullageState = "Pressurized";
+						fuelFlowStability = 1.0f;
+					}
+					else
+					{
+						ullageState = "Unpressurized";
+						fuelFlowStability = 0.0f;
+					}
+				}
+				else
+				{
+					if (fuelPressurized == true)
+					{
+						ullageState = "Very Stable";
+						fuelFlowStability = 1.0f;
+					}
+					else
+					{
+						ullageState = m_ullageSimulator.GetFuelFlowState();
+					}
+				}
+			}
+			else
+			{
+				if (isPressureFed == true)
+					ullageState = "Pressurized";
+				else
+					ullageState = "Very Stable";
+				fuelFlowStability = 1.0f;
+			}
 
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
@@ -421,6 +518,7 @@ namespace EngineIgnitor
 				if (IsEngineActivated() == true)
 				{
 					vessel.ctrlState.mainThrottle = 0.0f;
+					engine.BurstFlameoutGroups();
 					engine.SetRunningGroupsActive(false);
 					foreach (BaseEvent baseEvent in engine.Events)
 					{
@@ -460,6 +558,7 @@ namespace EngineIgnitor
 							if (IsEngineActivated() == true)
 							{
 								vessel.ctrlState.mainThrottle = 0.0f;
+								engine.BurstFlameoutGroups();
 								engine.SetRunningGroupsActive(false);
 								foreach (BaseEvent baseEvent in engine.Events)
 								{
@@ -525,6 +624,37 @@ namespace EngineIgnitor
 				}
 				ignitionsRemained += ignitionReloaded;
 			}
+		}
+
+		public bool IsModularFuelTankPressurizedFor(PartResource pr)
+		{
+			if (pr.part != null)
+			{
+				if (pr.part.Modules.Contains("ModuleFuelTanks"))
+				{
+					PartModule mfsModule = pr.part.Modules["ModuleFuelTanks"];
+					FieldInfo dictFieldInfo = (mfsModule.GetType().GetField("pressurizedFuels"));
+					Dictionary<string, bool> dict = (Dictionary<string, bool>)dictFieldInfo.GetValue(mfsModule);
+
+					if (dict.ContainsKey(pr.resourceName) == false)
+					{
+						//Debug.Log("No " + pr.resourceName + " resource in this tank.");
+						return false;
+					}
+					else
+					{
+						//Debug.Log(dict[pr.resourceName].ToString() + " " + pr.amount.ToString("F2"));
+						return (dict[pr.resourceName] && (pr.amount > 0.0));
+					}
+				}
+				else
+				{
+					// This fuel tank doesn't seem to have MFS module.
+					//Debug.Log("No MFS found.");
+					return false;
+				}
+			}
+			return false;
 		}
 
 		public override void OnSave(ConfigNode node)
