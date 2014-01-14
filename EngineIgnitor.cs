@@ -197,9 +197,9 @@ namespace EngineIgnitor
 
 			string ignitorInfo = "Ignitor: ";
 			if (ignitionsRemained == -1)
-				ignitorInfo += ignitorType + "(Infinite)";
+				ignitorInfo += ignitorType + "(Infinite).";
 			else
-				ignitorInfo += ignitorType + "(" + ignitionsRemained.ToString() + ")";
+				ignitorInfo += ignitorType + "(" + ignitionsRemained.ToString() + ").";
 
 			string resourceRequired = "";
 			if(ignitorResources.Count > 0)
@@ -226,7 +226,29 @@ namespace EngineIgnitor
 				ullageInfo = "Need settling down fuel before ignition.";
 				if (isPressureFed == true)
 				{
-					ullageInfo = "Pressure fed. Need pressurized fuel tanks.";
+					bool fuelPressurized = true;
+					foreach(Propellant p in engine.propellants)
+					{
+						bool foundPressurizedSource = false;
+						List<PartResource> resourceSources = new List<PartResource>();
+						engine.part.GetConnectedResources(p.id, resourceSources);
+						foreach (PartResource pr in resourceSources)
+						{
+							//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
+							if (IsModularFuelTankPressurizedFor(pr) == true)
+							{
+								foundPressurizedSource = true;
+								break;
+							}
+						}
+
+						if (foundPressurizedSource == false)
+						{
+							fuelPressurized = false;
+							break;
+						}
+					}
+					ullageInfo = "Pressure fed. " + (fuelPressurized ? "Pressurized fuel tank(s) connected." : "No pressurized fuel tank containing required resource(s) connected.");
 				}
 			}
 			else
