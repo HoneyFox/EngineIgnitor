@@ -201,7 +201,7 @@ namespace EngineIgnitor
 			else
 				ignitorInfo += ignitorType + "(" + ignitionsRemained.ToString() + ").";
 
-			string resourceRequired = "";
+			string resourceRequired = "No resource requirement for ignition.";
 			if(ignitorResources.Count > 0)
 			{
 				resourceRequired = "Ignition requires: ";
