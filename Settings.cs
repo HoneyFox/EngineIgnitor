@@ -45,6 +45,9 @@ namespace EngineIgnitor
 
 				UllageSimulator.s_RotateRollCoefficientX = s_Config.GetValue<float>("CoeffRotateRollX");
 				UllageSimulator.s_RotateRollCoefficientY = s_Config.GetValue<float>("CoeffRotateRollY");
+
+				UllageSimulator.s_VentingVelocity = s_Config.GetValue<float>("VentingVelocity");
+				UllageSimulator.s_VentingAccThreshold = s_Config.GetValue<float>("VentingAccThreshold");
 			}
 			catch (Exception e)
 			{

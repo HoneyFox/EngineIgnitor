@@ -312,7 +312,8 @@ namespace EngineIgnitor
 			}
 
 			// Update ullage.
-			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime);
+			float boilOffAcc = GetAccelerationOfMFSFuelBoilOff();
+			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime, boilOffAcc);
 			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability();
 
 			bool fuelPressurized = true;
@@ -472,6 +473,7 @@ namespace EngineIgnitor
 							foreach (IgnitorResource resource in ignitorResources)
 							{
 								resource.currentAmount = part.RequestResource(resource.name, resource.amount);
+								Debug.Log("Resource (" + resource.name + ") = " + resource.currentAmount.ToString("F2") + "/" + resource.amount.ToString("F2"));
 								minPotential = Mathf.Min(minPotential, resource.currentAmount / resource.amount);
 							}
 						}
@@ -485,6 +487,7 @@ namespace EngineIgnitor
 
 						if (UllageSimulator.s_SimulateUllage == true && useUllageSimulation == true)
 						{
+							//Debug.Log("FuelFlowStability = " + fuelFlowStability.ToString("F3"));
 							minPotential *= fuelFlowStability;
 						}
 
@@ -595,6 +598,33 @@ namespace EngineIgnitor
 						}
 					}
 				}
+
+				// Never mind...
+
+				//// Try to fix the cheaty way of connecting a small pressurized tank at the bottom of a big unpressurized tank.
+				//if (UllageSimulator.s_SimulateUllage == true && isPressureFed == true)
+				//{
+				//    if (IsEngineActivated() == true)
+				//    {
+				//        // part.FindResource_StackPriority(Part origin, List<PartResource> sources, int resourceID, double demand, int requestID)
+				//        foreach (Propellant propellant in engine.propellants)
+				//        {
+				//            List<PartResource> sources = new List<PartResource>();
+				//            MethodInfo mi = this.part.GetType().GetMethod("FindResource_StackPriority", BindingFlags.NonPublic | BindingFlags.Instance);
+				//            mi.Invoke(this.part, new object[] {this.part, sources, propellant.id, double.MaxValue, Part.NewRequestID()});
+
+				//            // Now all sources are here and should be in a certain order.
+				//            string output = "Engine: " + this.part.partInfo.title + "\n";
+				//            foreach (PartResource pr in sources)
+				//            {
+				//                output += "  Resource: " + pr.resourceName + "\n";
+				//                output += "    " + pr.part.partName + "( *" + pr.part.symmetryCounterparts.Count.ToString() + " ): ";
+				//                output += pr.amount.ToString("F1") + "/" + pr.maxAmount.ToString("F1") + "\n";
+				//            }
+				//            Debug.Log(output);
+				//        }
+				//    }
+				//}
 			}
 		}
 
@@ -677,6 +707,47 @@ namespace EngineIgnitor
 				}
 			}
 			return false;
+		}
+
+		public float GetAccelerationOfMFSFuelBoilOff()
+		{
+			if (vessel != null)
+			{
+				double massRate = 0.0f;
+				foreach (Part part in vessel.Parts)
+				{
+					if (part.Modules.Contains("ModuleFuelTanks"))
+					{
+						PartModule mfsModule = part.Modules["ModuleFuelTanks"];
+						FieldInfo fuelListFieldInfo = (mfsModule.GetType().GetField("fuelList"));
+						object listObj = (fuelListFieldInfo.GetValue(mfsModule));
+						int count = (int)(listObj.GetType().GetProperty("Count").GetValue(listObj, null));
+						for(int i = 0; i < count; ++i)
+						{
+							object obj = listObj.GetType().GetProperty("Item").GetValue(listObj, new object[] { i });
+
+							string resourceName = (string)(obj.GetType().GetField("name").GetValue(obj));
+							double loss_rate = (double)(obj.GetType().GetField("loss_rate").GetValue(obj));
+							double amount = (double)(obj.GetType().GetProperty("amount").GetValue(obj, null));
+							double maxAmount = (double)(obj.GetType().GetProperty("maxAmount").GetValue(obj, null));
+							float temperature = (float)(obj.GetType().GetField("temperature").GetValue(obj));
+
+							if (amount > 0 && loss_rate > 0 && part.temperature > temperature)
+							{
+								double loss = maxAmount * loss_rate * (part.temperature - temperature); // loss_rate is calibrated to 300 degrees.
+								if (loss > amount)
+									loss = amount;
+
+								massRate += loss * PartResourceLibrary.Instance.GetDefinition(resourceName).density;
+							}
+						}
+					}
+				}
+
+				return Convert.ToSingle(massRate) * UllageSimulator.s_VentingVelocity / vessel.GetTotalMass();
+			}
+			else
+				return 0.0f;
 		}
 
 		public override void OnSave(ConfigNode node)

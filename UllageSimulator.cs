@@ -11,7 +11,6 @@ namespace EngineIgnitor
 		public static bool s_SimulateUllage = true;
 		public static bool s_ShutdownEngineWhenUnstable = true;
 		public static bool s_ExplodeEngineWhenTooUnstable = false;
-
 		
 		public static float s_NaturalDiffusionRateX = 0.02f;
 		public static float s_NaturalDiffusionRateY = 0.03f;
@@ -28,6 +27,9 @@ namespace EngineIgnitor
 		public static float s_RotateRollCoefficientX = 0.005f;
 		public static float s_RotateRollCoefficientY = 0.006f;
 
+		public static float s_VentingVelocity = 100.0f;
+		public static float s_VentingAccThreshold = 0.00000004f;
+
 
 		float ullageHeightMin, ullageHeightMax;
 		float ullageRadialMin, ullageRadialMax;
@@ -36,13 +38,16 @@ namespace EngineIgnitor
 
 		public void Reset()
 		{
-			ullageHeightMax = 0.05f; ullageHeightMax = 0.95f;
+			ullageHeightMin = 0.05f; ullageHeightMax = 0.95f;
 			ullageRadialMin = 0.0f; ullageRadialMax = 0.95f;
 		}
 
-		public void Update(Vessel vessel, Part engine, float deltaTime)
+		public void Update(Vessel vessel, Part engine, float deltaTime, float ventingAcc = 0.0f)
 		{
 			if (vessel.isActiveVessel == false) return;
+
+			//if (ventingAcc != 0.0f) Debug.Log("BoilOffAcc: " + ventingAcc.ToString("F8"));
+			//else Debug.Log("BoilOffAcc: No boiloff.");
 
 			Vector3 localAcceleration = new Vector3(0.0f, 0.0f, 0.0f);
 			localAcceleration = engine.transform.InverseTransformDirection(vessel.acceleration - FlightGlobals.getGeeForceAtPosition(vessel.GetWorldPos3D()));
@@ -56,32 +61,41 @@ namespace EngineIgnitor
 			}
 
 			if (TimeWarp.WarpMode == TimeWarp.Modes.HIGH && TimeWarp.CurrentRate > TimeWarp.MaxPhysicsRate)
-			{ 
+			{
 				// Time warping... (5x -> 100000x)
 				//Debug.Log("Vessel state: " + vessel.Landed.ToString() + " " + vessel.Splashed.ToString() + " " + vessel.LandedOrSplashed.ToString());
 				if (vessel.LandedOrSplashed == true)
 				{
-					localAcceleration = engine.transform.InverseTransformDirection( -FlightGlobals.getGeeForceAtPosition(vessel.GetWorldPos3D()));
+					localAcceleration = engine.transform.InverseTransformDirection(-FlightGlobals.getGeeForceAtPosition(vessel.GetWorldPos3D()));
 					localAccelerationAmount = localAcceleration * deltaTime;
 					rotation.Set(0.0f, 0.0f, 0.0f);
 					rotationAmount.Set(0.0f, 0.0f, 0.0f);
 				}
 				else
 				{
-					localAcceleration.Set(0.0f, 0.0f, 0.0f);
-					localAccelerationAmount.Set(0.0f, 0.0f, 0.0f);
+					localAcceleration.Set(0.0f, ventingAcc, 0.0f);
+					localAccelerationAmount.Set(0.0f, ventingAcc * deltaTime, 0.0f);
 					rotation.Set(0.0f, 0.0f, 0.0f);
 					rotationAmount.Set(0.0f, 0.0f, 0.0f);
 				}
+			}
+			else
+			{
+				localAcceleration.y += ventingAcc;
+				localAccelerationAmount.y += ventingAcc * deltaTime;
 			}
 
 			//Debug.Log("Ullage: dt: " + deltaTime.ToString("F2") + " localAcc: " + localAcceleration.ToString() + " rotateRate: " + rotation.ToString());
 			
 			// Natural diffusion.
-			ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * deltaTime);
-			ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * deltaTime);
-			ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * deltaTime);
-			ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * deltaTime);
+			//Debug.Log("Ullage: LocalAcc: " + localAcceleration.ToString());
+			if (ventingAcc <= s_VentingAccThreshold)
+			{
+				ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+			}
 
 			// Translate forward/backward.
 			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY, 0.0f, 0.9f);
