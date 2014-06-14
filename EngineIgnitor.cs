@@ -314,30 +314,40 @@ namespace EngineIgnitor
 			// Update ullage.
 			float boilOffAcc = GetAccelerationOfMFSFuelBoilOff();
 			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime, boilOffAcc);
-			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability();
 
 			bool fuelPressurized = true;
-			foreach(Propellant p in engine.propellants)
+			float minFuelRatio = 1.0f;
+
+			foreach (Propellant p in engine.propellants)
 			{
+				double fuelAmount = 0.0;
+				double fuelMaxAmount = 0.0;
+
 				bool foundPressurizedSource = false;
 				List<PartResource> resourceSources = new List<PartResource>();
 				engine.part.GetConnectedResources(p.id, resourceSources);
 				foreach (PartResource pr in resourceSources)
 				{
 					//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
-					if (IsModularFuelTankPressurizedFor(pr) == true)
+					if (foundPressurizedSource == false && IsModularFuelTankPressurizedFor(pr) == true)
 					{
 						foundPressurizedSource = true;
-						break;
 					}
+
+					fuelAmount += pr.amount;
+					fuelMaxAmount += pr.maxAmount;
 				}
+
+				if (minFuelRatio > fuelAmount / fuelMaxAmount)
+					minFuelRatio = Convert.ToSingle(fuelAmount / fuelMaxAmount);
 
 				if (foundPressurizedSource == false)
 				{
 					fuelPressurized = false;
-					break;
 				}
 			}
+
+			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability(minFuelRatio);
 
 			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
 			{
