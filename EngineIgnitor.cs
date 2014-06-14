@@ -1,7 +1,6 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Reflection;
 using UnityEngine;
 
@@ -313,12 +312,10 @@ namespace EngineIgnitor
 
 			// Update ullage.
 			float boilOffAcc = GetAccelerationOfMFSFuelBoilOff();
-			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime, boilOffAcc);
-
+			
 			bool fuelPressurized = true;
 			float minFuelRatio = 1.0f;
-
-			foreach (Propellant p in engine.propellants)
+			foreach(Propellant p in engine.propellants)
 			{
 				double fuelAmount = 0.0;
 				double fuelMaxAmount = 0.0;
@@ -337,7 +334,7 @@ namespace EngineIgnitor
 					fuelAmount += pr.amount;
 					fuelMaxAmount += pr.maxAmount;
 				}
-
+				
 				if (minFuelRatio > fuelAmount / fuelMaxAmount)
 					minFuelRatio = Convert.ToSingle(fuelAmount / fuelMaxAmount);
 
@@ -347,8 +344,9 @@ namespace EngineIgnitor
 				}
 			}
 
+			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.deltaTime, boilOffAcc, minFuelRatio);
 			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability(minFuelRatio);
-
+			
 			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
 			{
 				if (isPressureFed == true)
@@ -690,74 +688,94 @@ namespace EngineIgnitor
 
 		public bool IsModularFuelTankPressurizedFor(PartResource pr)
 		{
-			if (pr.part != null)
-			{
-				if (pr.part.Modules.Contains("ModuleFuelTanks"))
-				{
-					PartModule mfsModule = pr.part.Modules["ModuleFuelTanks"];
-					FieldInfo dictFieldInfo = (mfsModule.GetType().GetField("pressurizedFuels"));
-					Dictionary<string, bool> dict = (Dictionary<string, bool>)dictFieldInfo.GetValue(mfsModule);
+		    if (pr.part == null || pr.amount <= 0) 
+				return false;
 
-					if (dict.ContainsKey(pr.resourceName) == false)
-					{
-						//Debug.Log("No " + pr.resourceName + " resource in this tank.");
-						return false;
-					}
-					else
-					{
-						//Debug.Log(dict[pr.resourceName].ToString() + " " + pr.amount.ToString("F2"));
-						return (dict[pr.resourceName] && (pr.amount > 0.0));
-					}
-				}
-				else
-				{
-					// This fuel tank doesn't seem to have MFS module.
-					//Debug.Log("No MFS found.");
-					return false;
-				}
+		    if (!pr.part.Modules.Contains("ModuleFuelTanks"))
+		    {
+		        // This fuel tank doesn't seem to have MFS module.
+		        //Debug.Log("No MFS found.");
+		        return false;
+		    }
+
+		    PartModule mfsModule = pr.part.Modules["ModuleFuelTanks"];
+
+			// NK assures me that ServiceModules are all explicitly pressurized, so we don't need to check the tank type.
+
+#if true
+			// Iterate through the list to find the fuel. We don't strictly need to do this, see below code.
+			var tankList = GetMFSTankList(mfsModule);
+		    foreach (var obj in tankList)
+		    {
+				string resourceName = (string)(obj.GetType().GetField("name").GetValue(obj));
+		        if (resourceName != pr.resourceName)
+		            continue;
+
+				string note = (string)(obj.GetType().GetField("note").GetValue(obj));
+				return note.IndexOf("pressurized", StringComparison.InvariantCultureIgnoreCase) >= 0;
 			}
-			return false;
+		    return false;
+#else
+			// This way would work with versions of MFT 5+ and RF 6+, and is (slightly) quicker, but will keep the above for backward compatibility
+			var tankList = GetMFSTankList(mfsModule);
+			if (!(bool)tankList.GetType().InvokeMember("Contains", BindingFlags.InvokeMethod, null, tankList, new object[] { pr.resourceName }))
+				return false;
+			object obj = tankList.GetType().InvokeMember("Item", BindingFlags.GetProperty, null, tankList, new object[] { pr.resourceName });
+
+			string note = (string)(obj.GetType().GetField("note").GetValue(obj));
+			return note.IndexOf("pressurized", StringComparison.InvariantCultureIgnoreCase) >= 0;
+#endif
 		}
 
-		public float GetAccelerationOfMFSFuelBoilOff()
+	    public float GetAccelerationOfMFSFuelBoilOff()
 		{
-			if (vessel != null)
+		    if (vessel == null)
+		        return 0.0f;
+
+		    double massRate = 0.0f;
+		    foreach (Part part in vessel.Parts)
+		    {
+		        if (!part.Modules.Contains("ModuleFuelTanks"))
+		            continue;
+
+		        PartModule mfsModule = part.Modules["ModuleFuelTanks"];
+
+		        IEnumerable tankList = GetMFSTankList(mfsModule);
+		        foreach (var obj in tankList)
+		        {
+		            string resourceName = (string) (obj.GetType().GetField("name").GetValue(obj));
+		            double loss_rate = (double) (obj.GetType().GetField("loss_rate").GetValue(obj));
+		            double amount = (double) (obj.GetType().GetProperty("amount").GetValue(obj, null));
+		            double maxAmount = (double) (obj.GetType().GetProperty("maxAmount").GetValue(obj, null));
+		            float temperature = (float) (obj.GetType().GetField("temperature").GetValue(obj));
+
+		            if (amount > 0 && loss_rate > 0 && part.temperature > temperature)
+		            {
+		                double loss = maxAmount*loss_rate*(part.temperature - temperature); // loss_rate is calibrated to 300 degrees.
+		                if (loss > amount)
+		                    loss = amount;
+
+		                massRate += loss*PartResourceLibrary.Instance.GetDefinition(resourceName).density;
+		            }
+		        }
+		    }
+
+		    return Convert.ToSingle(massRate)*UllageSimulator.s_VentingVelocity/vessel.GetTotalMass();
+		}
+
+		private static FieldInfo tankListFieldInfo;
+
+		private static IEnumerable GetMFSTankList(PartModule mfsModule)
+		{
+			if (tankListFieldInfo == null)
 			{
-				double massRate = 0.0f;
-				foreach (Part part in vessel.Parts)
-				{
-					if (part.Modules.Contains("ModuleFuelTanks"))
-					{
-						PartModule mfsModule = part.Modules["ModuleFuelTanks"];
-						FieldInfo fuelListFieldInfo = (mfsModule.GetType().GetField("fuelList"));
-						object listObj = (fuelListFieldInfo.GetValue(mfsModule));
-						int count = (int)(listObj.GetType().GetProperty("Count").GetValue(listObj, null));
-						for(int i = 0; i < count; ++i)
-						{
-							object obj = listObj.GetType().GetProperty("Item").GetValue(listObj, new object[] { i });
-
-							string resourceName = (string)(obj.GetType().GetField("name").GetValue(obj));
-							double loss_rate = (double)(obj.GetType().GetField("loss_rate").GetValue(obj));
-							double amount = (double)(obj.GetType().GetProperty("amount").GetValue(obj, null));
-							double maxAmount = (double)(obj.GetType().GetProperty("maxAmount").GetValue(obj, null));
-							float temperature = (float)(obj.GetType().GetField("temperature").GetValue(obj));
-
-							if (amount > 0 && loss_rate > 0 && part.temperature > temperature)
-							{
-								double loss = maxAmount * loss_rate * (part.temperature - temperature); // loss_rate is calibrated to 300 degrees.
-								if (loss > amount)
-									loss = amount;
-
-								massRate += loss * PartResourceLibrary.Instance.GetDefinition(resourceName).density;
-							}
-						}
-					}
-				}
-
-				return Convert.ToSingle(massRate) * UllageSimulator.s_VentingVelocity / vessel.GetTotalMass();
+				// Fall back to the pre MFS 5.0 / pre RF 6.0 fuelList. Either will work.
+				tankListFieldInfo =
+					(mfsModule.GetType().GetField("tankList", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+					?? (mfsModule.GetType().GetField("fuelList", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
 			}
-			else
-				return 0.0f;
+
+			return (IEnumerable)tankListFieldInfo.GetValue(mfsModule);
 		}
 
 		public override void OnSave(ConfigNode node)
