@@ -42,12 +42,9 @@ namespace EngineIgnitor
 			ullageRadialMin = 0.0f; ullageRadialMax = 0.95f;
 		}
 
-		public void Update(Vessel vessel, Part engine, float deltaTime, float ventingAcc = 0.0f, float fuelRatio = 0.9f)
+		public void Update(Vessel vessel, Part engine, float deltaTime, float ventingAcc = 0.0f)
 		{
 			if (vessel.isActiveVessel == false) return;
-
-			float fuelRatioFactor = (0.5f + fuelRatio) / 1.4f;
-			float invFuelRatioFactor = 1.0f / fuelRatioFactor;
 
 			//if (ventingAcc != 0.0f) Debug.Log("BoilOffAcc: " + ventingAcc.ToString("F8"));
 			//else Debug.Log("BoilOffAcc: No boiloff.");
@@ -94,24 +91,24 @@ namespace EngineIgnitor
 			//Debug.Log("Ullage: LocalAcc: " + localAcceleration.ToString());
 			if (ventingAcc <= s_VentingAccThreshold)
 			{
-				ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
-				ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
-				ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
-				ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * invFuelRatioFactor * deltaTime);
+				ullageHeightMin = Mathf.Lerp(ullageHeightMin, 0.05f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageHeightMax = Mathf.Lerp(ullageHeightMax, 0.95f, s_NaturalDiffusionRateY * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageRadialMin = Mathf.Lerp(ullageRadialMin, 0.00f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
+				ullageRadialMax = Mathf.Lerp(ullageRadialMax, 0.95f, s_NaturalDiffusionRateX * (1.0f - (ventingAcc / s_VentingAccThreshold)) * deltaTime);
 			}
 
 			// Translate forward/backward.
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + localAccelerationAmount.y * s_TranslateAxialCoefficientY * fuelRatioFactor, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX * fuelRatioFactor, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax + Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX * fuelRatioFactor, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin + localAccelerationAmount.y * s_TranslateAxialCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + localAccelerationAmount.y * s_TranslateAxialCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax + Mathf.Abs(localAccelerationAmount.y) * s_TranslateAxialCoefficientX, 0.1f, 1.0f);
 
 			// Translate up/down/left/right.
 			Vector3 sideAcc = new Vector3(localAccelerationAmount.x, 0.0f, localAccelerationAmount.z);
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin - sideAcc.magnitude * s_TranslateSidewayCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + sideAcc.magnitude * s_TranslateSidewayCoefficientY * fuelRatioFactor, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin + sideAcc.magnitude * s_TranslateSidewayCoefficientX * fuelRatioFactor, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax + sideAcc.magnitude * s_TranslateSidewayCoefficientX * fuelRatioFactor, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin - sideAcc.magnitude * s_TranslateSidewayCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + sideAcc.magnitude * s_TranslateSidewayCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin + sideAcc.magnitude * s_TranslateSidewayCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax + sideAcc.magnitude * s_TranslateSidewayCoefficientX, 0.1f, 1.0f);
 
 			// Rotate yaw/pitch.
 			Vector3 rotateYawPitch = new Vector3(rotation.x, 0.0f, rotation.z);
@@ -129,17 +126,17 @@ namespace EngineIgnitor
 			ullageRadialMax = Mathf.Clamp(ullageRadialMax + rotateYawPitch.magnitude * s_RotateYawPitchCoefficientX, 0.1f, 1.0f);
 			
 			// Rotate roll.
-			ullageHeightMin = Mathf.Clamp(ullageHeightMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientY * fuelRatioFactor, 0.0f, 0.9f);
-			ullageHeightMax = Mathf.Clamp(ullageHeightMax + Mathf.Abs(rotation.y) * s_RotateRollCoefficientY * fuelRatioFactor, 0.1f, 1.0f);
-			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX * fuelRatioFactor, 0.0f, 0.9f);
-			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX * fuelRatioFactor, 0.1f, 1.0f);
+			ullageHeightMin = Mathf.Clamp(ullageHeightMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientY, 0.0f, 0.9f);
+			ullageHeightMax = Mathf.Clamp(ullageHeightMax + Mathf.Abs(rotation.y) * s_RotateRollCoefficientY, 0.1f, 1.0f);
+			ullageRadialMin = Mathf.Clamp(ullageRadialMin - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX, 0.0f, 0.9f);
+			ullageRadialMax = Mathf.Clamp(ullageRadialMax - Mathf.Abs(rotation.y) * s_RotateRollCoefficientX, 0.1f, 1.0f);
 
 			//Debug.Log("Ullage: Height: (" + ullageHeightMin.ToString("F2") + " - " + ullageHeightMax.ToString("F2") + ") Radius: (" + ullageRadialMin.ToString("F2") + " - " + ullageRadialMax.ToString("F2") + ")");
 		}
 
-		public float GetFuelFlowStability(float fuelRatio = 0.9f)
+		public float GetFuelFlowStability()
 		{
-			float bLevel = Mathf.Clamp((ullageHeightMax - ullageHeightMin) * (ullageRadialMax - ullageRadialMin) / 0.1f * Mathf.Clamp(8.2f - 8 * fuelRatio, 0.0f, 8.2f) - 1.0f, 0.0f, 15.0f);
+			float bLevel = Mathf.Clamp((ullageHeightMax - ullageHeightMin) * (ullageRadialMax - ullageRadialMin) / 0.1f - 1.0f, 0.0f, 10.0f);
 			//Debug.Log("Ullage: bLevel: " + bLevel.ToString("F3"));
 	
 			float pVertical = 1.0f;
