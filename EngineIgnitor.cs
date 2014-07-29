@@ -230,7 +230,7 @@ namespace EngineIgnitor
 					{
 						bool foundPressurizedSource = false;
 						List<PartResource> resourceSources = new List<PartResource>();
-						engine.part.GetConnectedResources(p.id, resourceSources);
+						engine.part.GetConnectedResources(p.id, p.GetFlowMode(), resourceSources);
 						foreach (PartResource pr in resourceSources)
 						{
 							//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
@@ -322,7 +322,7 @@ namespace EngineIgnitor
 
 				bool foundPressurizedSource = false;
 				List<PartResource> resourceSources = new List<PartResource>();
-				engine.part.GetConnectedResources(p.id, resourceSources);
+				engine.part.GetConnectedResources(p.id, p.GetFlowMode(), resourceSources);
 				foreach (PartResource pr in resourceSources)
 				{
 					//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
