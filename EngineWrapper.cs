@@ -52,6 +52,39 @@ namespace EngineIgnitor
 			}
 		}
 
+		public float minThrust
+		{
+			get 
+			{
+				if (isModuleEngineFX == false)
+					return engine.minThrust;
+				else
+					return engineFX.minThrust;
+			}
+		}
+
+		public float maxThrust
+		{
+			get
+			{
+				if (isModuleEngineFX == false)
+					return engine.maxThrust;
+				else
+					return engineFX.maxThrust;
+			}
+		}
+
+		public bool throttleLocked
+		{
+			get
+			{
+				if (isModuleEngineFX == false)
+					return engine.throttleLocked;
+				else
+					return engineFX.throttleLocked;
+			}
+		}
+
 		public List<Propellant> propellants
 		{
 			get
@@ -101,6 +134,17 @@ namespace EngineIgnitor
 					return engine.allowShutdown;
 				else
 					return engineFX.allowShutdown;
+			}
+		}
+
+		public bool flameout
+		{ 
+			get
+			{
+				if (isModuleEngineFX == false)
+					return engine.flameout;
+				else
+					return engineFX.getFlameoutState;
 			}
 		}
 	}

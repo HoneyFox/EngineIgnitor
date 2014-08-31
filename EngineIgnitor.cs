@@ -386,14 +386,14 @@ namespace EngineIgnitor
 
 			if (m_startState == StartState.None || m_startState == StartState.Editor) return;
 			if (engine == null) return;
-			if (engine.allowShutdown == false) return;
+			//if (engine.allowShutdown == false) return;
 
 			
 			// Record old state.
 			EngineIgnitionState oldState = engineState;
 			// Decide new state.
-			//Debug.Log("Engine: " + engine.requestedThrottle.ToString("F2") + " " + engine.requestedThrust.ToString("F1") + " " + engine.currentThrottle.ToString("F2") + " " + engine.engineShutdown.ToString());
-			if (engine.requestedThrust == 0.0f || IsEngineActivated() == false)
+			//Debug.Log("Engine: " + engine.requestedThrust.ToString("F4"));
+			if (engine.requestedThrust <= 0.0f || engine.flameout == true || (IsEngineActivated() == false && engine.allowShutdown == true))
 			{
 				if (engine.part.temperature >= autoIgnitionTemperature)
 				{
@@ -406,7 +406,15 @@ namespace EngineIgnitor
 			}
 			else
 			{
-				engineState = EngineIgnitionState.IGNITED;
+				if (oldState != EngineIgnitionState.IGNITED)
+				{
+					// When changing from not-ignited to ignited, we must ensure that the throttle is non-zero.
+					// Or if the throttle is locked. (SRBs)
+					if (vessel.ctrlState.mainThrottle > 0.0f || engine.throttleLocked == true)
+					{
+						engineState = EngineIgnitionState.IGNITED;
+					}
+				}
 			}
 
 			// This flag is for low-resource state.
@@ -550,7 +558,6 @@ namespace EngineIgnitor
 			{
 				if (IsEngineActivated() == true)
 				{
-					vessel.ctrlState.mainThrottle = 0.0f;
 					engine.BurstFlameoutGroups();
 					engine.SetRunningGroupsActive(false);
 					foreach (BaseEvent baseEvent in engine.Events)
@@ -590,7 +597,6 @@ namespace EngineIgnitor
 
 							if (IsEngineActivated() == true)
 							{
-								vessel.ctrlState.mainThrottle = 0.0f;
 								engine.BurstFlameoutGroups();
 								engine.SetRunningGroupsActive(false);
 								foreach (BaseEvent baseEvent in engine.Events)

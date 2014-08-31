@@ -14,7 +14,6 @@ namespace EngineIgnitor
 
 		public void Awake()
 		{
-			DontDestroyOnLoad(s_Singleton);
 			LoadSettings();
 		}
 
@@ -53,16 +52,6 @@ namespace EngineIgnitor
 			{
 			//	Debug.Log("Failed to Load EngineIgnitor Settings: " + e.Message);
 			}
-		}
-	}
-
-	public class EngineIgnitorUnitTest : KSP.Testing.UnitTest
-	{
-		public EngineIgnitorUnitTest()
-		{
-			GameObject gameObj = new GameObject("EngineIgnitor", typeof(EngineIgnitorCore));
-			EngineIgnitorCore.s_Singleton = gameObj.GetComponent<EngineIgnitorCore>();
-			GameObject.DontDestroyOnLoad(gameObj);
 		}
 	}
 }
