@@ -8,6 +8,9 @@ namespace EngineIgnitor
 {
 	public class EngineIgnitorUnit : PartModule
 	{
+		public static bool s_RequiresEngineerPower = true;
+		private static ProtoCrewMember s_HasNotifiedCrewMember = null;
+		
 		public static List<EngineIgnitorUnit> s_IgnitorPacksOnEva = new List<EngineIgnitorUnit>();
 
 		[KSPField(isPersistant = true)]
@@ -34,22 +37,34 @@ namespace EngineIgnitor
 
 				if (ignitors != 0 && vessel != null)
 				{
+					ProtoCrewMember crew = vessel.evaController.part.protoModuleCrew[0];
+					bool hasEngineerExperienceEffect = crew.experienceTrait.Effects.Exists((Experience.ExperienceEffect effect) => effect is Experience.Effects.EnginePower);
+					bool canUseIgnitorUnit = (hasEngineerExperienceEffect || s_RequiresEngineerPower == false);
+
+					if ((s_HasNotifiedCrewMember == null || s_HasNotifiedCrewMember != vessel.evaController.part.protoModuleCrew[0]) && canUseIgnitorUnit == false)
+					{
+						ScreenMessages.PostScreenMessage("Requires engineer power.", 4.0f, ScreenMessageStyle.UPPER_CENTER);
+						s_HasNotifiedCrewMember = vessel.evaController.part.protoModuleCrew[0];
+					}
+					
 					if (vessel.isEVA && vessel.isActiveVessel == true)
 					{
 						// We are now being grabbed by an EVA I guess...
-						if (s_IgnitorPacksOnEva.Contains(this) == false)
+						if (s_IgnitorPacksOnEva.Contains(this) == false && canUseIgnitorUnit)
 							s_IgnitorPacksOnEva.Add(this);
 					}
 					else
 					{
 						if (s_IgnitorPacksOnEva.Contains(this) == true)
 							s_IgnitorPacksOnEva.Remove(this);
+						s_HasNotifiedCrewMember = null;
 					}
 				}
 				else
 				{
 					if (s_IgnitorPacksOnEva.Contains(this) == true)
 						s_IgnitorPacksOnEva.Remove(this);
+					s_HasNotifiedCrewMember = null;
 				}
 			}
 		}
@@ -74,7 +89,9 @@ namespace EngineIgnitor
 
 		public override string GetInfo()
 		{
-			return "Contains " + ((ignitors != -1) ? ignitors.ToString() : "infinite") + " " + ignitorType + " ignitor unit" + ((ignitors == -1 || ignitors > 1) ? "s.\n" : ".\n");
+			return (s_RequiresEngineerPower ? "Requires an engineer Kerbal to use it.\n" : "") + 
+				"Contains " + ((ignitors != -1) ? ignitors.ToString() : "infinite") + " " 
+				+ ignitorType + " ignitor unit" + ((ignitors == -1 || ignitors > 1) ? "s." : ".");
 		}
 	}
 }

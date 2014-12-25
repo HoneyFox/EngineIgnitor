@@ -26,6 +26,8 @@ namespace EngineIgnitor
 
 				Debug.Log("EngineIgnitor Settings Loaded.");
 
+				EngineIgnitorUnit.s_RequiresEngineerPower = s_Config.GetValue<bool>("ReloadIgnitorRequiresEngineerPower");
+
 				UllageSimulator.s_SimulateUllage = s_Config.GetValue<bool>("SimulateUllage");
 				UllageSimulator.s_ShutdownEngineWhenUnstable = s_Config.GetValue<bool>("ShutdownWhenUnstable");
 				UllageSimulator.s_ExplodeEngineWhenTooUnstable = s_Config.GetValue<bool>("ExplodeWhenTooUnstable");
