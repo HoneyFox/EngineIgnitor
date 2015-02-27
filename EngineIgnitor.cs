@@ -710,6 +710,7 @@ namespace EngineIgnitor
         public void UpdateRF(bool inFlight = true)
         {
             int curParts = -1;
+            List<Part> partList = null;
             if (inFlight)
             {
                 if (vessel == null)
@@ -718,7 +719,10 @@ namespace EngineIgnitor
                     return;
                 }
                 else
+                {
                     curParts = vessel.Parts.Count;
+                    partList = vessel.parts;
+                }
             }
             else
             {
@@ -728,63 +732,39 @@ namespace EngineIgnitor
                     return;
                 }
                 else
+                {
                     curParts = EditorLogic.SortedShipList.Count;
+                    partList = EditorLogic.SortedShipList;
+                }
             }
             if (vesselTanks == null || vParts != curParts)
             {
                 vesselTanks = new Dictionary<Part, Dictionary<string, RFTank>>();
-                List<PartModule> rfModules = new List<PartModule>();
-                if (inFlight)
+                for (int i = 0; i < partList.Count; i++)
                 {
-                    for (int i = 0; i < vessel.Parts.Count; i++)
+                    if (!partList[i].Modules.Contains("ModuleFuelTanks"))
+                        continue;
+                    if (noRFfields)
                     {
-                        if (!vessel.Parts[i].Modules.Contains("ModuleFuelTanks"))
-                            continue;
-                        if (noRFfields)
-                        {
-                            rfModule = vessel.Parts[i].Modules["ModuleFuelTanks"].GetType();
-                            RFfuelList = rfModule.GetField("fuelList");
-                            RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
-                            noRFfields = false;
-                        }
-                        PartModule mfsModule = vessel.Parts[i].Modules["ModuleFuelTanks"];
-                        rfModules.Add(mfsModule);
+                        rfModule = partList[i].Modules["ModuleFuelTanks"].GetType();
+                        RFfuelList = rfModule.GetField("fuelList");
+                        RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
+                        noRFfields = false;
                     }
-                }
-                else
-                {
-                    // Yes, copypasta code >.>
-                    for (int i = 0; i < EditorLogic.SortedShipList.Count; i++)
-                    {
-                        if (!EditorLogic.SortedShipList[i].Modules.Contains("ModuleFuelTanks"))
-                            continue;
-                        if (noRFfields)
-                        {
-                            rfModule = EditorLogic.SortedShipList[i].Modules["ModuleFuelTanks"].GetType();
-                            RFfuelList = rfModule.GetField("fuelList");
-                            RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
-                            noRFfields = false;
-                        }
-                        PartModule mfsModule = EditorLogic.SortedShipList[i].Modules["ModuleFuelTanks"];
-                        rfModules.Add(mfsModule);
-                    }
-                }
-                for (int i = 0; i < rfModules.Count; i++)
-                {
-                    IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(rfModules[i]);
-                    Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(rfModules[i]);
-                    if (noRFTankfields)
-                    {
-                        var obj = tankList.GetEnumerator().MoveNext();
-                        rfTank = obj.GetType();
-                        RFname = rfTank.GetField("name");
-                        RFloss_rate = rfTank.GetField("loss_rate");
-                        RFtemperature = rfTank.GetField("temperature");
-                        noRFTankfields = false;
-                    }
+                    PartModule mfsModule = vessel.Parts[i].Modules["ModuleFuelTanks"];
+                    IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(mfsModule);
+                    Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(mfsModule);
                     Dictionary<string, RFTank> tanks = new Dictionary<string, RFTank>();
                     foreach (var obj in tankList)
                     {
+                        if (noRFTankfields)
+                        {
+                            rfTank = obj.GetType();
+                            RFname = rfTank.GetField("name");
+                            RFloss_rate = rfTank.GetField("loss_rate");
+                            RFtemperature = rfTank.GetField("temperature");
+                            noRFTankfields = false;
+                        }
                         RFTank tank;
                         tank.name = (string)(RFname.GetValue(obj));
                         tank.rate = (double)(RFloss_rate.GetValue(obj));
