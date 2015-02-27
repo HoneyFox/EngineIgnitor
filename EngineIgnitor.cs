@@ -123,43 +123,46 @@ namespace EngineIgnitor
             + ":" + minutes.ToString("D2") + ":" + seconds.ToString("D2");
         }
 
+        public void Start()
+        {
+            vParts = -1;
+            engines.Clear();
+            foreach (PartModule module in this.part.Modules)
+            {
+                if (module is ModuleEngines)
+                {
+                    engines.Add(new EngineWrapper(module as ModuleEngines));
+                }
+                else if (module is ModuleEnginesFX)
+                {
+                    engines.Add(new EngineWrapper(module as ModuleEnginesFX));
+                }
+            }
+            if (engines.Count > engineIndex)
+                engine = engines[engineIndex];
+            else
+                engine = null;
+
+            m_ullageSimulator.Reset();
+            if (useUllageSimulation == false || UllageSimulator.s_SimulateUllage == false)
+            {
+                ullageState = "Very Stable";
+            }
+            //Debug.Log("Restoring them from strings.");
+            ignitorResources.Clear();
+            foreach (string str in ignitorResourcesStr)
+            {
+                ignitorResources.Add(IgnitorResource.FromString(str));
+            }
+        }
+
 		public override void OnStart(StartState state)
 		{
 			m_startState = state;
 
-			engines.Clear();
-			foreach (PartModule module in this.part.Modules)
-			{
-				if (module is ModuleEngines)
-				{
-					engines.Add(new EngineWrapper(module as ModuleEngines));
-				}
-				else if (module is ModuleEnginesFX)
-				{
-					engines.Add(new EngineWrapper(module as ModuleEnginesFX));
-				}
-			}
-			if (engines.Count > engineIndex)
-				engine = engines[engineIndex];
-			else
-				engine = null;
-
 			if (state == StartState.Editor)
 			{
 				ignitionsRemained = ignitionsAvailable;
-			}
-
-			m_ullageSimulator.Reset();
-			if (useUllageSimulation == false || UllageSimulator.s_SimulateUllage == false)
-			{
-				ullageState = "Very Stable";
-			}
-
-			//Debug.Log("Restoring them from strings.");
-			ignitorResources.Clear();
-			foreach (string str in ignitorResourcesStr)
-			{
-				ignitorResources.Add(IgnitorResource.FromString(str));
 			}
 		}
 
@@ -204,6 +207,8 @@ namespace EngineIgnitor
 			//Debug.Log("ModuleEngineIgnitor: OnGUI() " + ignitorResources.Count.ToString());
 			if (m_isEngineMouseOver == false) return;
 
+            UpdateRF(false);
+
 			string ignitorInfo = "Ignitor: ";
 			if (ignitionsRemained == -1)
 				ignitorInfo += ignitorType + "(Infinite).";
@@ -231,39 +236,35 @@ namespace EngineIgnitor
 
 			string ullageInfo = "";
 			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
-			{
 				ullageInfo = "Need settling down fuel before ignition.";
-				if (isPressureFed == true)
-				{
-					bool fuelPressurized = true;
-					foreach(Propellant p in engine.propellants)
-					{
-						bool foundPressurizedSource = false;
-						List<PartResource> resourceSources = new List<PartResource>();
-						engine.part.GetConnectedResources(p.id, p.GetFlowMode(), resourceSources);
-						foreach (PartResource pr in resourceSources)
-						{
-							//Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
-							if (RFIsPressurized(pr) == true)
-							{
-								foundPressurizedSource = true;
-								break;
-							}
-						}
-
-						if (foundPressurizedSource == false)
-						{
-							fuelPressurized = false;
-							break;
-						}
-					}
-					ullageInfo = "Pressure fed. " + (fuelPressurized ? "Pressurized fuel tank(s) connected." : "No pressurized fuel tank containing required resource(s) connected.");
-				}
-			}
 			else
-			{
-				ullageInfo = "Ullage simulation disabled.";
-			}
+                ullageInfo = "Ullage simulation disabled.";
+            if (isPressureFed == true)
+            {
+                bool fuelPressurized = true;
+                foreach (Propellant p in engine.propellants)
+                {
+                    bool foundPressurizedSource = false;
+                    List<PartResource> resourceSources = new List<PartResource>();
+                    engine.part.GetConnectedResources(p.id, p.GetFlowMode(), resourceSources);
+                    foreach (PartResource pr in resourceSources)
+                    {
+                        //Debug.Log("Propellant: " + pr.resourceName + " " + IsModularFuelTankPressurizedFor(pr).ToString());
+                        if (RFIsPressurized(pr) == true)
+                        {
+                            foundPressurizedSource = true;
+                            break;
+                        }
+                    }
+
+                    if (foundPressurizedSource == false)
+                    {
+                        fuelPressurized = false;
+                        break;
+                    }
+                }
+                ullageInfo += ", Pressure fed. " + (fuelPressurized ? "Pressurized fuel tank(s) connected." : "No pressurized fuel tank containing required resource(s) connected.");
+            }
 
 			Vector2 screenCoords = Camera.main.WorldToScreenPoint(part.transform.position);
 			Rect ignitorInfoRect = new Rect(screenCoords.x - 100.0f, Screen.height - screenCoords.y - 30.0f, 200.0f, 20.0f);
@@ -301,8 +302,11 @@ namespace EngineIgnitor
             return engine.EngineIgnited;
 		}
 
-		public override void OnFixedUpdate()
+		public void FixedUpdate()
 		{
+            if (!HighLogic.LoadedSceneIsFlight)
+                return;
+
 			if (m_startState == StartState.None || m_startState == StartState.Editor || (object)engine == null) return;
 
 			if (ignitionsRemained != -1)
@@ -363,26 +367,24 @@ namespace EngineIgnitor
 			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
 			{
                 ullageState = m_ullageSimulator.GetFuelFlowState();
-                if (isPressureFed)
-                {
-                    if (fuelPressurized == true)
-                    {
-                        ullageState += ", Pressurized";
-                    }
-                    else
-                    {
-                        ullageState += ", Unpressurized";
-                        fuelFlowStability = 0.0f;
-                    }
-                }
 			}
 			else
 			{
 			    ullageState = "Very Stable";
 				fuelFlowStability = 1.0f;
-                if (isPressureFed == true)
-                    ullageState += ", Pressurized";
 			}
+            if (isPressureFed)
+            {
+                if (fuelPressurized == true)
+                {
+                    ullageState += ", Pressurized";
+                }
+                else
+                {
+                    ullageState += ", Unpressurized";
+                    fuelFlowStability = 0.0f;
+                }
+            }
 
 			
 			// Record old state.
@@ -705,30 +707,72 @@ namespace EngineIgnitor
             public bool pFed;
         }
         Dictionary<Part, Dictionary<string, RFTank>> vesselTanks = null;
-        public void UpdateRF()
+        public void UpdateRF(bool inFlight = true)
         {
-            if (vessel == null)
+            int curParts = -1;
+            if (inFlight)
             {
-                vParts = -1;
-                return;
+                if (vessel == null)
+                {
+                    vParts = -1;
+                    return;
+                }
+                else
+                    curParts = vessel.Parts.Count;
             }
-            if (vesselTanks == null || vParts != vessel.Parts.Count)
+            else
+            {
+                if (EditorLogic.SortedShipList.Count == 0)
+                {
+                    vParts = -1;
+                    return;
+                }
+                else
+                    curParts = EditorLogic.SortedShipList.Count;
+            }
+            if (vesselTanks == null || vParts != curParts)
             {
                 vesselTanks = new Dictionary<Part, Dictionary<string, RFTank>>();
-                for (int i = 0; i < vessel.Parts.Count; i++)
+                List<PartModule> rfModules = new List<PartModule>();
+                if (inFlight)
                 {
-                    if (!vessel.Parts[i].Modules.Contains("ModuleFuelTanks"))
-                        continue;
-                    if (noRFfields)
+                    for (int i = 0; i < vessel.Parts.Count; i++)
                     {
-                        rfModule = vessel.Parts[i].Modules["ModuleFuelTanks"].GetType();
-                        RFfuelList = rfModule.GetField("fuelList");
-                        RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
-                        noRFfields = false;
+                        if (!vessel.Parts[i].Modules.Contains("ModuleFuelTanks"))
+                            continue;
+                        if (noRFfields)
+                        {
+                            rfModule = vessel.Parts[i].Modules["ModuleFuelTanks"].GetType();
+                            RFfuelList = rfModule.GetField("fuelList");
+                            RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
+                            noRFfields = false;
+                        }
+                        PartModule mfsModule = vessel.Parts[i].Modules["ModuleFuelTanks"];
+                        rfModules.Add(mfsModule);
                     }
-                    PartModule mfsModule = vessel.Parts[i].Modules["ModuleFuelTanks"];
-                    IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(mfsModule);
-                    Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(mfsModule);
+                }
+                else
+                {
+                    // Yes, copypasta code >.>
+                    for (int i = 0; i < EditorLogic.SortedShipList.Count; i++)
+                    {
+                        if (!EditorLogic.SortedShipList[i].Modules.Contains("ModuleFuelTanks"))
+                            continue;
+                        if (noRFfields)
+                        {
+                            rfModule = EditorLogic.SortedShipList[i].Modules["ModuleFuelTanks"].GetType();
+                            RFfuelList = rfModule.GetField("fuelList");
+                            RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
+                            noRFfields = false;
+                        }
+                        PartModule mfsModule = EditorLogic.SortedShipList[i].Modules["ModuleFuelTanks"];
+                        rfModules.Add(mfsModule);
+                    }
+                }
+                for (int i = 0; i < rfModules.Count; i++)
+                {
+                    IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(rfModules[i]);
+                    Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(rfModules[i]);
                     if (noRFTankfields)
                     {
                         var obj = tankList.GetEnumerator().MoveNext();
