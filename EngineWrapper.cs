@@ -147,5 +147,15 @@ namespace EngineIgnitor
 					return engineFX.getFlameoutState;
 			}
 		}
+        public bool EngineIgnited
+        {
+            get
+            {
+                if (isModuleEngineFX)
+                    return engineFX.EngineIgnited;
+                else
+                    return engine.EngineIgnited;
+            }
+        }
 	}
 }
