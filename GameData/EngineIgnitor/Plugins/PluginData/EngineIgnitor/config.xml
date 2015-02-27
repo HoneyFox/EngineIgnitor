@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<config>
+    <bool name="SimulateUllage">1</bool>
+    <bool name="ShutdownWhenUnstable">1</bool>
+    <bool name="ExplodeWhenTooUnstable">0</bool>
+    
+    <float name="CoeffNaturalDiffusionX">0.05</float>
+    <float name="CoeffNaturalDiffusionY">0.06</float>
+    
+    <float name="CoeffTranslateAxialX">0.30</float>
+    <float name="CoeffTranslateAxialY">0.86</float>
+    <float name="CoeffTranslateSidewayX">0.05</float>
+    <float name="CoeffTranslateSidewayY">0.03</float>
+    
+    <float name="CoeffRotateYawPitchX">0.018</float>
+    <float name="CoeffRotateYawPitchY">0.012</float>
+    <float name="CoeffRotateRollX">0.018</float>
+    <float name="CoeffRotateRollY">0.024</float>
+    
+    <float name="VentingVelocity">100</float>
+    <float name="VentingAccThreshold">0.0000001</float>
+</config>
