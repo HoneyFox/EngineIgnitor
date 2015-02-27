@@ -751,7 +751,7 @@ namespace EngineIgnitor
                         RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
                         noRFfields = false;
                     }
-                    PartModule mfsModule = vessel.Parts[i].Modules["ModuleFuelTanks"];
+                    PartModule mfsModule = partList[i].Modules["ModuleFuelTanks"];
                     IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(mfsModule);
                     Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(mfsModule);
                     Dictionary<string, RFTank> tanks = new Dictionary<string, RFTank>();
@@ -776,8 +776,8 @@ namespace EngineIgnitor
                         tanks[tank.name] = tank;
                     }
                 }
+                vParts = curParts;
             }
-            vParts = vessel.Parts.Count;
         }
 
         public bool RFIsPressurized(PartResource pr)
