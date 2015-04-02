@@ -744,15 +744,16 @@ namespace EngineIgnitor
                 {
                     if (!partList[i].Modules.Contains("ModuleFuelTanks"))
                         continue;
+                    PartModule mfsModule = partList[i].Modules["ModuleFuelTanks"];
                     if (noRFfields)
                     {
-                        rfModule = partList[i].Modules["ModuleFuelTanks"].GetType();
+                        rfModule = mfsModule.GetType();
                         RFfuelList = rfModule.GetField("fuelList");
                         RFpressurizedFuels = rfModule.GetField("pressurizedFuels");
                         noRFfields = false;
                     }
-                    PartModule mfsModule = partList[i].Modules["ModuleFuelTanks"];
-                    IEnumerable tankList = (IEnumerable)RFfuelList.GetValue(mfsModule);
+
+                    IEnumerable tankList = (IEnumerable)(RFfuelList.GetValue(mfsModule));
                     Dictionary<string, bool> pfed = (Dictionary<string, bool>)RFpressurizedFuels.GetValue(mfsModule);
                     Dictionary<string, RFTank> tanks = new Dictionary<string, RFTank>();
                     foreach (var obj in tankList)
@@ -765,7 +766,7 @@ namespace EngineIgnitor
                             RFtemperature = rfTank.GetField("temperature");
                             noRFTankfields = false;
                         }
-                        RFTank tank;
+                        RFTank tank = new RFTank();
                         tank.name = (string)(RFname.GetValue(obj));
                         tank.rate = (double)(RFloss_rate.GetValue(obj));
                         tank.temp = (float)(RFtemperature.GetValue(obj));
@@ -775,6 +776,7 @@ namespace EngineIgnitor
                             tank.pFed = false;
                         tanks[tank.name] = tank;
                     }
+                    vesselTanks[partList[i]] = tanks;
                 }
                 vParts = curParts;
             }
@@ -784,9 +786,10 @@ namespace EngineIgnitor
         {
             if (pr.part == null || pr.amount <= 0)
                 return false;
-            if (vesselTanks.ContainsKey(pr.part))
-                if (vesselTanks[pr.part].ContainsKey(pr.resourceName))
-                    return vesselTanks[pr.part][pr.resourceName].pFed;
+            if (vesselTanks != null) // should never be null, but let's not assume.
+                if(vesselTanks.ContainsKey(pr.part))
+                    if (vesselTanks[pr.part].ContainsKey(pr.resourceName))
+                        return vesselTanks[pr.part][pr.resourceName].pFed;
             return false;
         }
 	    public float RFBoiloffAcceleration()
