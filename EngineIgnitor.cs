@@ -361,11 +361,12 @@ namespace EngineIgnitor
 				}
 			}
 
-			m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.fixedDeltaTime, boilOffAcc, minFuelRatio);
-			float fuelFlowStability = m_ullageSimulator.GetFuelFlowStability(minFuelRatio);
+            float fuelFlowStability = 1f;
 			
 			if (useUllageSimulation == true && UllageSimulator.s_SimulateUllage == true)
 			{
+                m_ullageSimulator.Update(this.vessel, this.engine.part, TimeWarp.fixedDeltaTime, boilOffAcc, minFuelRatio);
+                fuelFlowStability = m_ullageSimulator.GetFuelFlowStability(minFuelRatio);
                 ullageState = m_ullageSimulator.GetFuelFlowState();
 			}
 			else
@@ -477,11 +478,11 @@ namespace EngineIgnitor
 				// We need to consume one ignitor to light it up.
 				if (ignitionsRemained > 0 || ignitionsRemained == -1 || externalIgnitorAvailable == true)
 				{
+                    float minPotential = 1.0f;
 					if (ignitorResources.Count > 0)
 					{
 						//Debug.Log("We need to check ignitor resources.");
 						// We need to check if we have all ignitor resources.
-						float minPotential = 1.0f;
 						if (!(externalIgnitorAvailable == true && externalIgnitor.provideRequiredResources == true))
 						{
 							foreach (IgnitorResource resource in ignitorResources)
@@ -498,30 +499,27 @@ namespace EngineIgnitor
 								externalIgnitor.ConsumeResource();
 							}
 						}
+                    }
+                    else
+                    {
+                        //Debug.Log("No ignitor resource needed.");
+                    }
 
-						if (UllageSimulator.s_SimulateUllage == true && useUllageSimulation == true)
-						{
-							//Debug.Log("FuelFlowStability = " + fuelFlowStability.ToString("F3"));
-							minPotential *= fuelFlowStability;
-						}
+					// already only changed based on Ullage flags so no if needed here.
+					minPotential *= fuelFlowStability;
 
-						bool ignited = (UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential);
-						//Debug.Log("Potential = " + minPotential.ToString("F2") + " Ignited: " + ignited.ToString());
-						if (ignited == false)
-						{
-							engineState = EngineIgnitionState.NOT_IGNITED;
-
-							// Low in resources. Prefer to shutdown. Otherwise the ignitor device will be expired.
-							//if (minPotential < 0.95f)
-							//	preferShutdown = true;
-
-							// Always shutdown the engine if it fails to ignite. player can manually retry.
-							preferShutdown = true;
-						}
-					}
-					else
+					bool ignited = (UnityEngine.Random.Range(0.0f, 1.0f) <= minPotential);
+					//Debug.Log("Potential = " + minPotential.ToString("F2") + " Ignited: " + ignited.ToString());
+					if (ignited == false)
 					{
-						//Debug.Log("No ignitor resource needed.");
+						engineState = EngineIgnitionState.NOT_IGNITED;
+
+						// Low in resources. Prefer to shutdown. Otherwise the ignitor device will be expired.
+						//if (minPotential < 0.95f)
+						//	preferShutdown = true;
+
+						// Always shutdown the engine if it fails to ignite. player can manually retry.
+						preferShutdown = true;
 					}
 
 					// The ignitor device has been used no matter the ignition is successful or not.
@@ -794,20 +792,26 @@ namespace EngineIgnitor
         }
 	    public float RFBoiloffAcceleration()
 		{
-		    if (vessel == null)
+            if (vessel == null || vesselTanks == null || vesselTanks.Count == 0)
 		        return 0.0f;
 
 		    double massRate = 0.0f;
-            foreach(Dictionary<string, RFTank> tanks in vesselTanks.Values)
+            foreach(Part p in vesselTanks.Keys)
             {
-		        foreach(RFTank tank in tanks.Values)
+                Dictionary<string, RFTank> tanks = vesselTanks[p];
+                if (tanks == null) // should never be true, but...
+                    continue;
+		        foreach(PartResource r in p.Resources)
 		        {
-                    PartResource r = part.Resources[tank.name];
+                    if (!tanks.ContainsKey(r.resourceName))
+                        continue;
+                    RFTank tank = tanks[r.resourceName];
                     double amount = r.amount;
 		            double maxAmount = r.maxAmount;
-		            if (amount > 0 && tank.rate > 0 && part.temperature > tank.temp)
+                    double tDelta = p.temperature - tank.temp;
+		            if (amount > 0d && tank.rate > 0d && tDelta > 0d)
 		            {
-		                double loss = maxAmount*tank.rate*(part.temperature - tank.temp); // loss_rate is calibrated to 300 degrees.
+		                double loss = maxAmount*tank.rate*tDelta; // loss_rate is calibrated to 300 degrees.
 		                if (loss > amount)
 		                    loss = amount;
 
@@ -816,7 +820,7 @@ namespace EngineIgnitor
 		        }
 		    }
 
-		    return Convert.ToSingle(massRate)*UllageSimulator.s_VentingVelocity/vessel.GetTotalMass();
+		    return Convert.ToSingle(massRate)*UllageSimulator.s_VentingVelocity/vessel.GetTotalMass(); // alas we can't cache mass.
 		}
 
 		public override void OnSave(ConfigNode node)
