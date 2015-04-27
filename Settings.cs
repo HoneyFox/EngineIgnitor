@@ -52,7 +52,7 @@ namespace EngineIgnitor
 			}
 			catch (Exception e)
 			{
-			//	Debug.Log("Failed to Load EngineIgnitor Settings: " + e.Message);
+				Debug.Log("Failed to Load EngineIgnitor Settings: " + e.Message);
 			}
 		}
 	}
